@@ -3,7 +3,7 @@ package duckchess
 import com.google.common.cache.Cache
 import com.google.common.cache.CacheBuilder
 
-class TranspositionCache<SCORE>(maxSize: Int = 1_000_000) {
+class TranspositionCache<SCORE>(maxSize: Int = 3_000_000) {
     val cache: Cache<CacheEntryKey, CacheEntry<SCORE>> = CacheBuilder.newBuilder()
         .initialCapacity(maxSize)
         .maximumSize(maxSize.toLong())
@@ -12,27 +12,35 @@ class TranspositionCache<SCORE>(maxSize: Int = 1_000_000) {
 
     class CacheEntry<SCORE>(
         var remainingDepth: Int,
-        var score: SCORE
+        var score: SCORE,
+        var alpha: Int,
+        var beta: Int
     )
 
     data class CacheEntryKey(val hashA: Long, val hashB: Long)
 
-    fun get(board: Board, remainingDepth: Int): CacheEntry<SCORE>? {
+    fun get(board: Board): CacheEntry<SCORE>? {
         val key = cacheEntryKey(board)
         return cache.getIfPresent(key)
-            ?.takeIf { cacheEntry -> cacheEntry.remainingDepth >= remainingDepth }
     }
 
-    fun set(board: Board, remainingDepth: Int, score: SCORE) {
+    fun set(board: Board, remainingDepth: Int, score: SCORE, alpha: Int, beta: Int) {
         val key = cacheEntryKey(board)
         var cacheEntry = cache.getIfPresent(key)
         if (cacheEntry == null) {
-            cacheEntry = CacheEntry(remainingDepth, score)
+            cacheEntry = CacheEntry(remainingDepth, score, alpha, beta)
             cache.put(key, cacheEntry)
         } else {
-            if (cacheEntry.remainingDepth < remainingDepth) {
+            val canOverride = when {
+                cacheEntry.remainingDepth < remainingDepth -> true
+                cacheEntry.remainingDepth == remainingDepth -> (alpha <= cacheEntry.alpha && cacheEntry.beta <= beta)
+                else -> false
+            }
+            if (canOverride) {
                 cacheEntry.remainingDepth = remainingDepth
                 cacheEntry.score = score
+                cacheEntry.alpha = alpha
+                cacheEntry.beta = beta
             }
         }
     }

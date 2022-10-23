@@ -9,8 +9,10 @@ fun play(initialBoard: Board) {
     var currentBoard = initialBoard
     var moveNumber = 2
 
+    val minMax = MinMax(4)
+
     while (currentBoard.result == GameResult.UNDECIDED) {
-        val minMax = MinMax(if (currentBoard.phase == Phase.WHITE_PIECE_MOVE) 7 else 4)
+        minMax.maxDepth = if (currentBoard.phase == Phase.WHITE_PIECE_MOVE) 7 else 4
 
         val selected: SelectedMove
         val millis = measureTimeMillis {
@@ -33,7 +35,7 @@ fun play(initialBoard: Board) {
 
         currentBoard = selected.move.moveAt(currentBoard)
         currentBoard = selected.duckMove.moveAt(currentBoard)
-        if (currentBoard.phase == Phase.WHITE_DUCK_MOVE) {
+        if (currentBoard.phase == Phase.WHITE_PIECE_MOVE) {
             moveNumber++
         }
 
