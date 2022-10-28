@@ -2,7 +2,7 @@ package duckchess
 
 import kotlin.math.absoluteValue
 
-class TranspositionCache<SCORE>(val maxSize: Int = 6_000_000) {
+class TranspositionCache<SCORE>(val maxSize: Int = 8_000_000) {
     val cache: Array<CacheEntry<SCORE>> = Array(maxSize) {
         CacheEntry(0, 0, 0, null, 0, 0)
     }

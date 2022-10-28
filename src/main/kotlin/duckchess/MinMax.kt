@@ -1,5 +1,8 @@
 package duckchess
 
+import java.time.Duration
+import java.time.Instant
+
 private fun whiteWinsScore(): Int = 100_000
 private fun blackWinsScore(): Int = -100_000
 
@@ -26,19 +29,48 @@ data class BoardEval(
     }
 }
 
-data class SelectedMove(val move: Move, val duckMove: DuckMove, val score: Int) {
+data class SelectedMove(val move: Move, val duckMove: DuckMove, val score: Int, val depth: Int) {
     fun text(board: Board): String {
-        return "${move.text(board)}${duckMove.text(board)} score: $score"
+        return "${move.text(board)}${duckMove.text(board)} score: $score, depth: $depth"
     }
 }
 
 private data class MoveWithScore(val move: Move, val score: Int)
 
-class MinMax(var maxDepth: Int, val evaluator: Evaluator = Evaluator()) {
+private class Stop: RuntimeException()
+
+class MinMax(val evaluator: Evaluator = Evaluator()) {
     var counter: Long = 0
+    var cutOffTime: Instant? = null
     val transpositionCache = TranspositionCache<BoardEval>()
 
-    fun bestMove(board: Board): SelectedMove {
+    fun bestMove(boardArg: Board, duration: Duration): SelectedMove {
+        val board = boardArg.copyBoard()
+        val start = Instant.now()
+        cutOffTime = null
+        var selectedMove: SelectedMove? = null
+        var maxDepth = 3
+        while(true) {
+            try {
+                val startThisDepth = Instant.now()
+                selectedMove = bestMove(board, maxDepth)
+                println("Best move at depth ${maxDepth}: ${selectedMove.text(board)}")
+                val endThisDepth = Instant.now()
+                val durationThisDepth = Duration.between(startThisDepth, endThisDepth)
+                cutOffTime = start.plus(duration)
+                maxDepth++
+                if (Instant.now().plus(durationThisDepth).plus(Duration.ofSeconds(3)).isAfter(cutOffTime)) {
+                    println("Giving up on evaluating at depth ${maxDepth}")
+                    return selectedMove!!
+                }
+            } catch (e: Stop) {
+                println("Time has run out at depth ${maxDepth}")
+                return selectedMove!!
+            }
+        }
+    }
+
+    fun bestMove(board: Board, maxDepth: Int): SelectedMove {
         counter = 0
         val areWeWhite: Boolean = when (board.phase) {
             Phase.WHITE_PIECE_MOVE -> true
@@ -57,7 +89,7 @@ class MinMax(var maxDepth: Int, val evaluator: Evaluator = Evaluator()) {
             worstAlpha,
         )!!
 
-        return SelectedMove(boardEval.moveA!!, DuckMove.of(boardEval.duckMoveA!!), boardEval.scoreA)
+        return SelectedMove(boardEval.moveA!!, DuckMove.of(boardEval.duckMoveA!!), boardEval.scoreA, maxDepth)
     }
 
     /**
@@ -74,6 +106,8 @@ class MinMax(var maxDepth: Int, val evaluator: Evaluator = Evaluator()) {
         if (board.result != GameResult.UNDECIDED) {
             return finalResult(board, areWeWhite)
         }
+
+        cutOffTime?.let { if (Instant.now().isAfter(it)) throw Stop() }
 
         if (remainingDepth <= 0) {
             counter++

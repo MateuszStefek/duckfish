@@ -1,5 +1,7 @@
 package duckchess
 
+import duckchess.Coord.Companion.D2
+import java.time.Duration
 import kotlin.system.measureTimeMillis
 
 fun play(initialBoard: Board) {
@@ -9,14 +11,14 @@ fun play(initialBoard: Board) {
     var currentBoard = initialBoard
     var moveNumber = 2
 
-    val minMax = MinMax(4)
+    val minMax = MinMax()
 
     while (currentBoard.result == GameResult.UNDECIDED) {
-        minMax.maxDepth = if (currentBoard.phase == Phase.WHITE_PIECE_MOVE) 7 else 4
+        //minMax.maxDepth = if (currentBoard.phase == Phase.WHITE_PIECE_MOVE) 7 else 4
 
         val selected: SelectedMove
         val millis = measureTimeMillis {
-            selected = minMax.bestMove(currentBoard)
+            selected = minMax.bestMove(currentBoard, Duration.ofSeconds(30))
         }
 
         System.gc()
@@ -26,7 +28,6 @@ fun play(initialBoard: Board) {
 
         println(
             "Moving: $moveNumber. ${selected.text(currentBoard)}," +
-                " depth: ${minMax.maxDepth}" +
                 " evaluated positions: ${minMax.counter}" +
                 " evaluated in ${millis}ms " +
                 " memUsage:$memUsage" +
@@ -54,6 +55,8 @@ fun main() {
     board = DuckMove.of(Coord.E6).moveAt(board)
     board = KnightSimpleMove.of(Coord.B8, Coord.C6).moveAt(board)
     board = DuckMove.of(Coord.E2).moveAt(board)
+    board = PawnOneStepMove.of(D2, Coord.D3).moveAt(board)
+    board = DuckMove.of(Coord.F6).moveAt(board)
 
     play(board)
 }
