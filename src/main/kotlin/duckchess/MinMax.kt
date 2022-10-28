@@ -1,7 +1,7 @@
 package duckchess
 
-private fun whiteWinsScore(depth: Int): Int = 100_000 - depth
-private fun blackWinsScore(depth: Int): Int = -100_000 + depth
+private fun whiteWinsScore(): Int = 100_000
+private fun blackWinsScore(): Int = -100_000
 
 data class BoardEval(
     val scoreA: Int,
@@ -42,7 +42,7 @@ class MinMax(var maxDepth: Int, val evaluator: Evaluator = Evaluator()) {
 
         val boardEval = negMax(
             board,
-            0,
+            maxDepth,
             areWeWhite,
             Integer.MIN_VALUE + 5,
             Integer.MAX_VALUE - 5,
@@ -55,17 +55,16 @@ class MinMax(var maxDepth: Int, val evaluator: Evaluator = Evaluator()) {
     /**
      * @return null, when pruned by alpha-beta.
      */
-    private fun negMax(board: Board, depth: Int, areWeWhite: Boolean, gAArg: Int, gB: Int, alpha: BoardEval): BoardEval? {
+    private fun negMax(board: Board, remainingDepth: Int, areWeWhite: Boolean, gAArg: Int, gB: Int, alpha: BoardEval): BoardEval? {
         if (board.result != GameResult.UNDECIDED) {
-            return finalResult(board, depth, areWeWhite)
+            return finalResult(board, areWeWhite)
         }
 
-        if (depth >= maxDepth) {
+        if (remainingDepth <= 0) {
             return evaluator.evaluation(board)
         }
 
         var gA = gAArg
-        val remainingDepth = maxDepth - depth
 
         val cacheEntry = transpositionCache.get(board)
         if (cacheEntry != null && cacheEntry.remainingDepth >= remainingDepth) {
@@ -90,7 +89,11 @@ class MinMax(var maxDepth: Int, val evaluator: Evaluator = Evaluator()) {
 
         val allMoves: MutableList<MoveWithScore> = kotlin.collections.ArrayList(64)
         board.generateMoves { move ->
-            allMoves.add(MoveWithScore(move, moveStrengthEstimation(move, board, areWeWhite)))
+            var strengthEst = moveStrengthEstimation(move, board, areWeWhite)
+            if (move == cacheEntry?.score?.moveA) {
+                strengthEst += 300
+            }
+            allMoves.add(MoveWithScore(move, strengthEst))
         }
 
         allMoves.sortByDescending { move -> move.score }
@@ -114,12 +117,12 @@ class MinMax(var maxDepth: Int, val evaluator: Evaluator = Evaluator()) {
                     }
                 }
 
-                val nextDepth = when {
+                val nextRemainingDepth = when {
                     // (move is CaptureMove && depth == maxDepth - 1) -> depth
-                    else -> depth + 1
+                    else -> remainingDepth - 1
                 }
 
-                val eval: BoardEval? = negMax(boardWithoutDuck, nextDepth, !areWeWhite, -gB, -gA, beta)
+                val eval: BoardEval? = negMax(boardWithoutDuck, nextRemainingDepth, !areWeWhite, -gB, -gA, beta)
                 if (eval != null) {
                     s.update(
                         -eval.scoreA,
@@ -158,7 +161,7 @@ class MinMax(var maxDepth: Int, val evaluator: Evaluator = Evaluator()) {
         } else {
 */
 
-            transpositionCache.set(boardWithoutDuck, remainingDepth = maxDepth - depth, score = result, gAArg, gB)
+            transpositionCache.set(boardWithoutDuck, remainingDepth = remainingDepth, score = result, gAArg, gB)
 //        }
 
         return result
@@ -198,19 +201,19 @@ class MinMax(var maxDepth: Int, val evaluator: Evaluator = Evaluator()) {
         }
     }
 
-    private fun finalResult(board: Board, depth: Int, areWeWhite: Boolean): BoardEval {
+    private fun finalResult(board: Board, areWeWhite: Boolean): BoardEval {
         val multiplier: Int = if (areWeWhite) 1 else -1
         return when (val result = board.result) {
             GameResult.WHITE_WON -> BoardEval(
-                multiplier * whiteWinsScore(depth),
+                multiplier * whiteWinsScore(),
                 Coord.A1,
-                multiplier * whiteWinsScore(depth),
+                multiplier * whiteWinsScore(),
                 Coord.B1
             )
             GameResult.BLACK_WON -> BoardEval(
-                multiplier * blackWinsScore(depth),
+                multiplier * blackWinsScore(),
                 Coord.A1,
-                multiplier * blackWinsScore(depth),
+                multiplier * blackWinsScore(),
                 Coord.B1
             )
             else -> throw IllegalArgumentException("Non-final $result")
