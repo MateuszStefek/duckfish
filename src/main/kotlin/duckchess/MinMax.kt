@@ -106,8 +106,10 @@ class MinMax(var maxDepth: Int, val evaluator: Evaluator = Evaluator()) {
         val allMoves: MutableList<MoveWithScore> = kotlin.collections.ArrayList(64)
         board.generateMoves { move ->
             var strengthEst = moveStrengthEstimation(move, board, areWeWhite)
-            if (move == cacheEntry?.score?.moveA) {
-                strengthEst += 300
+            if (cacheEntry != null) {
+                if (move === cacheEntry.score?.moveA) {
+                    strengthEst += 300
+                }
             }
             allMoves.add(MoveWithScore(move, strengthEst))
         }
