@@ -1,51 +1,33 @@
 package duckchess
 
-import com.google.common.cache.Cache
-import com.google.common.cache.CacheBuilder
+import kotlin.math.absoluteValue
 
-class TranspositionCache<SCORE>(maxSize: Int = 3_000_000) {
-    val cache: Cache<CacheEntryKey, CacheEntry<SCORE>> = CacheBuilder.newBuilder()
-        .initialCapacity(maxSize)
-        .maximumSize(maxSize.toLong())
-        .recordStats()
-        .build()
+class TranspositionCache<SCORE>(val maxSize: Int = 7_000_000) {
+    val cache: Array<CacheEntry<SCORE>> = Array(maxSize) {
+        CacheEntry(0, 0, 0, null, 0, 0)
+    }
 
     class CacheEntry<SCORE>(
+        var hashA: Long,
+        var hashB: Long,
         var remainingDepth: Int,
-        var score: SCORE,
+        var score: SCORE?,
         var alpha: Int,
         var beta: Int
     )
 
-    data class CacheEntryKey(val hashA: Long, val hashB: Long)
-
     fun get(board: Board): CacheEntry<SCORE>? {
-        val key = cacheEntryKey(board)
-        return cache.getIfPresent(key)
+        acacheEntry(board,
+            matching = { entry -> return entry },
+            nonMatching = { _, _, _ -> return null })
+        return null
     }
 
-    fun set(board: Board, remainingDepth: Int, score: SCORE, alpha: Int, beta: Int) {
-        val key = cacheEntryKey(board)
-        var cacheEntry = cache.getIfPresent(key)
-        if (cacheEntry == null) {
-            cacheEntry = CacheEntry(remainingDepth, score, alpha, beta)
-            cache.put(key, cacheEntry)
-        } else {
-            val canOverride = when {
-                cacheEntry.remainingDepth < remainingDepth -> true
-                cacheEntry.remainingDepth == remainingDepth -> (alpha <= cacheEntry.alpha && cacheEntry.beta <= beta)
-                else -> false
-            }
-            if (canOverride) {
-                cacheEntry.remainingDepth = remainingDepth
-                cacheEntry.score = score
-                cacheEntry.alpha = alpha
-                cacheEntry.beta = beta
-            }
-        }
-    }
-
-    private fun cacheEntryKey(board: Board): CacheEntryKey {
+    private inline fun acacheEntry(
+        board: Board,
+        matching: (CacheEntry<SCORE>) -> Unit,
+        nonMatching: (CacheEntry<SCORE>, Long, Long) -> Unit
+    ) {
         var hashA = board.zobristHash.hashA
         var hashB = board.zobristHash.hashB
         // TODO include these inside the zobrist hash
@@ -55,6 +37,45 @@ class TranspositionCache<SCORE>(maxSize: Int = 3_000_000) {
         if (board.blackLongCastlingAllowed) hashA = hashA xor 8
         if (board.enPassantColumn > 0) hashA = hashA xor board.enPassantColumn.toLong() * 16
         hashB = hashB xor board.phase.ordinal.toLong() * 999
-        return CacheEntryKey(hashA, hashB)
+
+        val bucket: Int = (hashA.toInt() % maxSize).absoluteValue
+        if (bucket < 0 || bucket >= maxSize) throw IllegalStateException("$hashA")
+
+
+        val entry = cache[bucket]
+        if (entry.hashA == board.zobristHash.hashA &&
+            entry.hashB == board.zobristHash.hashB &&
+            entry.score != null
+        ) {
+            matching(entry)
+        } else {
+            nonMatching(entry, hashA, hashB)
+        }
     }
+
+    fun set(board: Board, remainingDepth: Int, score: SCORE, alpha: Int, beta: Int) {
+        acacheEntry(board,
+            matching = { cacheEntry ->
+                val canOverride = when {
+                    cacheEntry.remainingDepth < remainingDepth -> true
+                    cacheEntry.remainingDepth == remainingDepth -> (alpha <= cacheEntry.alpha && cacheEntry.beta <= beta)
+                    else -> false
+                }
+                if (canOverride) {
+                    cacheEntry.remainingDepth = remainingDepth
+                    cacheEntry.score = score
+                    cacheEntry.alpha = alpha
+                    cacheEntry.beta = beta
+                }
+            },
+            nonMatching = { cacheEntry, hashA, hashB ->
+                cacheEntry.hashA = hashA
+                cacheEntry.hashB = hashB
+                cacheEntry.remainingDepth = remainingDepth
+                cacheEntry.score = score
+                cacheEntry.alpha = alpha
+                cacheEntry.beta = beta
+            })
+    }
+
 }

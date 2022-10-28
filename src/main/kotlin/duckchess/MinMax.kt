@@ -3,6 +3,14 @@ package duckchess
 private fun whiteWinsScore(): Int = 100_000
 private fun blackWinsScore(): Int = -100_000
 
+private inline fun negScore(score: Int): Int {
+    return when {
+        score > 0 -> 1 - score
+        score < 0 -> -1 - score
+        else -> score
+    }
+}
+
 data class BoardEval(
     val scoreA: Int,
     val duckPosA: Coord,
@@ -31,7 +39,7 @@ class MinMax(var maxDepth: Int, val evaluator: Evaluator = Evaluator()) {
     val transpositionCache = TranspositionCache<BoardEval>()
 
     fun bestMove(board: Board): SelectedMove {
-        counter=0
+        counter = 0
         val areWeWhite: Boolean = when (board.phase) {
             Phase.WHITE_PIECE_MOVE -> true
             Phase.BLACK_PIECE_MOVE -> false
@@ -55,12 +63,20 @@ class MinMax(var maxDepth: Int, val evaluator: Evaluator = Evaluator()) {
     /**
      * @return null, when pruned by alpha-beta.
      */
-    private fun negMax(board: Board, remainingDepth: Int, areWeWhite: Boolean, gAArg: Int, gB: Int, alpha: BoardEval): BoardEval? {
+    private fun negMax(
+        board: Board,
+        remainingDepth: Int,
+        areWeWhite: Boolean,
+        gAArg: Int,
+        gB: Int,
+        alpha: BoardEval
+    ): BoardEval? {
         if (board.result != GameResult.UNDECIDED) {
             return finalResult(board, areWeWhite)
         }
 
         if (remainingDepth <= 0) {
+            counter++
             return evaluator.evaluation(board)
         }
 
@@ -71,7 +87,7 @@ class MinMax(var maxDepth: Int, val evaluator: Evaluator = Evaluator()) {
             if (cacheEntry.alpha <= gA && cacheEntry.beta >= gB) {
                 return cacheEntry.score
             }
-            if (cacheEntry.score.scoreA > cacheEntry.alpha && cacheEntry.score.scoreB < cacheEntry.beta) {
+            if (cacheEntry.score!!.scoreA > cacheEntry.alpha && cacheEntry.score!!.scoreB < cacheEntry.beta) {
                 return cacheEntry.score
             }
         }
@@ -125,12 +141,12 @@ class MinMax(var maxDepth: Int, val evaluator: Evaluator = Evaluator()) {
                 val eval: BoardEval? = negMax(boardWithoutDuck, nextRemainingDepth, !areWeWhite, -gB, -gA, beta)
                 if (eval != null) {
                     s.update(
-                        -eval.scoreA,
+                        negScore(eval.scoreA),
                         predicate = { coord -> coord != eval.duckPosA && !move.blockedByDuckAt(coord) },
                         move, eval.duckPosA
                     )
                     s.update(
-                        -eval.scoreB,
+                        negScore(eval.scoreB),
                         predicate = { coord -> coord != eval.duckPosB && !move.blockedByDuckAt(coord) },
                         move, eval.duckPosB
                     )
@@ -146,7 +162,13 @@ class MinMax(var maxDepth: Int, val evaluator: Evaluator = Evaluator()) {
 
             if (gA >= gB) {
                 var prunedScore = s.bottomTwo().copy(scoreA = gA, scoreB = gA)
-                transpositionCache.set(boardWithoutDuck, remainingDepth = remainingDepth, score = prunedScore, gAArg, gB)
+                transpositionCache.set(
+                    boardWithoutDuck,
+                    remainingDepth = remainingDepth,
+                    score = prunedScore,
+                    gAArg,
+                    gB
+                )
                 return prunedScore
             }
         }
@@ -161,7 +183,7 @@ class MinMax(var maxDepth: Int, val evaluator: Evaluator = Evaluator()) {
         } else {
 */
 
-            transpositionCache.set(boardWithoutDuck, remainingDepth = remainingDepth, score = result, gAArg, gB)
+        transpositionCache.set(boardWithoutDuck, remainingDepth = remainingDepth, score = result, gAArg, gB)
 //        }
 
         return result

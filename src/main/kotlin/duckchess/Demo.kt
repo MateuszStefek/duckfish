@@ -30,7 +30,7 @@ fun play(initialBoard: Board) {
                 " evaluated positions: ${minMax.counter}" +
                 " evaluated in ${millis}ms " +
                 " memUsage:$memUsage" +
-                " cache: ${minMax.transpositionCache.cache.size()} ${minMax.transpositionCache.cache.stats()}"
+                " cache: ${minMax.transpositionCache.maxSize}"
         )
 
         currentBoard = selected.move.moveAt(currentBoard)
