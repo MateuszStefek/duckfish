@@ -18,10 +18,10 @@ fun play(initialBoard: Board) {
 
         val selected: SelectedMove
         val millis = measureTimeMillis {
-            selected = minMax.bestMove(currentBoard, Duration.ofSeconds(30))
+            selected = minMax.bestMove(currentBoard, Duration.ofSeconds(5))
         }
 
-        System.gc()
+        //System.gc()
         var memUsage = with(Runtime.getRuntime()) {
             totalMemory() - freeMemory()
         }

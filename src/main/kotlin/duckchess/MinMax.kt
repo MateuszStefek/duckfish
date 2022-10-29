@@ -49,22 +49,22 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
         val start = Instant.now()
         cutOffTime = null
         var selectedMove: SelectedMove? = null
-        var maxDepth = 3
+        var maxDepth = 9
         while(true) {
             try {
                 val startThisDepth = Instant.now()
                 selectedMove = bestMove(board, maxDepth)
-                println("Best move at depth ${maxDepth}: ${selectedMove.text(board)}")
+                println("Best move at depth ${maxDepth/3}: ${selectedMove.text(board)}")
                 val endThisDepth = Instant.now()
                 val durationThisDepth = Duration.between(startThisDepth, endThisDepth)
                 cutOffTime = start.plus(duration)
-                maxDepth++
+                maxDepth+=3
                 if (Instant.now().plus(durationThisDepth).plus(Duration.ofSeconds(3)).isAfter(cutOffTime)) {
-                    println("Giving up on evaluating at depth ${maxDepth}")
+                    println("Giving up on evaluating at depth ${maxDepth/3}")
                     return selectedMove!!
                 }
             } catch (e: Stop) {
-                println("Time has run out at depth ${maxDepth}")
+                println("Time has run out at depth ${maxDepth/3}")
                 return selectedMove!!
             }
         }
@@ -84,12 +84,12 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
             board,
             maxDepth,
             areWeWhite,
-            Integer.MIN_VALUE + 5,
-            Integer.MAX_VALUE - 5,
+            -99999,
+            99999,
             worstAlpha,
         )!!
 
-        return SelectedMove(boardEval.moveA!!, DuckMove.of(boardEval.duckMoveA!!), boardEval.scoreA, maxDepth)
+        return SelectedMove(boardEval.moveA!!, DuckMove.of(boardEval.duckMoveA!!), boardEval.scoreA, maxDepth/3)
     }
 
     /**
@@ -116,7 +116,7 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
 
         var gA = gAArg
 
-        val cacheEntry = transpositionCache.get(board)
+        var cacheEntry = transpositionCache.get(board)
         if (cacheEntry != null && cacheEntry.remainingDepth >= remainingDepth) {
             if (cacheEntry.alpha <= gA && cacheEntry.beta >= gB) {
                 return cacheEntry.score
@@ -170,19 +170,20 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
                 }
 
                 val nextRemainingDepth = when {
-                    // (move is CaptureMove && depth == maxDepth - 1) -> depth
-                    else -> remainingDepth - 1
+                    remainingDepth == 1 -> 0
+                    remainingDepth < 3 && move is CaptureMove -> remainingDepth - 1
+                    else -> remainingDepth - 3
                 }
 
                 val eval: BoardEval? = negMax(boardWithoutDuck, nextRemainingDepth, !areWeWhite, -gB, -gA, beta)
                 if (eval != null) {
                     s.update(
-                        negScore(eval.scoreA),
+                        minOf(gB + 1, negScore(eval.scoreA)),
                         predicate = { coord -> coord != eval.duckPosA && !move.blockedByDuckAt(coord) },
                         move, eval.duckPosA
                     )
                     s.update(
-                        negScore(eval.scoreB),
+                        minOf(gB + 1, negScore(eval.scoreB)),
                         predicate = { coord -> coord != eval.duckPosB && !move.blockedByDuckAt(coord) },
                         move, eval.duckPosB
                     )
@@ -219,7 +220,7 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
         } else {
 */
 
-        transpositionCache.set(boardWithoutDuck, remainingDepth = remainingDepth, score = result, gAArg, gB)
+        transpositionCache.set(board, remainingDepth = remainingDepth, score = result, gAArg, gB)
 //        }
 
         return result
@@ -231,10 +232,13 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
         return when (move) {
             is PawnCaptureMove -> {
                 val capturedPiece = board[move.to]
-                if (capturedPiece != Piece.WHITE_PAWN && capturedPiece != Piece.BLACK_PAWN) {
-                    return 200
+                when (capturedPiece) {
+                    Piece.WHITE_PAWN -> 100
+                    Piece.BLACK_PAWN -> 100
+                    Piece.WHITE_KING -> 1000
+                    Piece.BLACK_KING -> 1000
+                    else -> 200
                 }
-                return 100
             }
             is DiagonalCaptureMove -> 50
             is RookCaptureMove -> 50

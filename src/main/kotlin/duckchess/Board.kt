@@ -386,7 +386,9 @@ class Board(
                 append("|\n")
             }
             append("--".repeat(8))
-            append("-\n")
+            append("- ep: ${enPassantColumn}")
+            append("\n")
+
             toString()
         }
     }

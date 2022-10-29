@@ -79,11 +79,15 @@ sealed interface Move {
 
     fun moveAt(board: Board): Board {
         var boardCopy: Board? = null
-        internalMoveImpl(board) {
+        var originalEp = board.enPassantColumn
+        moveAndRevert(board) {
             boardCopy = board.copyBoard()
         }
         val result = boardCopy!!
-        result.phase = result.nextPhase()
+        if (this is DuckMove) {
+            result.enPassantColumn = originalEp
+        }
+        //result.phase = result.nextPhase()
         return result
     }
 

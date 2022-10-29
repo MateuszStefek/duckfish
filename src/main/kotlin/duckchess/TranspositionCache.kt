@@ -2,7 +2,7 @@ package duckchess
 
 import kotlin.math.absoluteValue
 
-class TranspositionCache<SCORE>(val maxSize: Int = 8_000_000) {
+class TranspositionCache<SCORE>(val maxSize: Int = 15_000_000) {
     val cache: Array<CacheEntry<SCORE>> = Array(maxSize) {
         CacheEntry(0, 0, 0, null, 0, 0)
     }
@@ -35,7 +35,7 @@ class TranspositionCache<SCORE>(val maxSize: Int = 8_000_000) {
         if (board.whiteLongCastlingAllowed) hashA = hashA xor 2
         if (board.blackShortCastlingAllowed) hashA = hashA xor 4
         if (board.blackLongCastlingAllowed) hashA = hashA xor 8
-        if (board.enPassantColumn > 0) hashA = hashA xor board.enPassantColumn.toLong() * 16
+        if (board.enPassantColumn >= 0) hashA = hashA xor (board.enPassantColumn.toLong() * 16)
         hashB = hashB xor board.phase.ordinal.toLong() * 999
 
         val bucket: Int = (hashA.toInt() % maxSize).absoluteValue
