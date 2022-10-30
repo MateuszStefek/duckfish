@@ -18,7 +18,7 @@ fun play(initialBoard: Board) {
 
         val selected: SelectedMove
         val millis = measureTimeMillis {
-            selected = minMax.bestMove(currentBoard, Duration.ofSeconds(5 + Random.nextInt(7).toLong()))
+            selected = minMax.bestMove(currentBoard, Duration.ofSeconds(5 + Random.nextInt(10).toLong()))
         }
 
         //System.gc()

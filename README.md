@@ -4,12 +4,19 @@ An Engine that plays a chess variant called [Duck Chess](https://duckchess.com/)
 
 Written in Kotlin as an exercise.
 
+JVM is not a good platform for computation-heavy programs.
+A lot of code ugliness is a result of performance hacking to avoid allocations.
+
+# Running
+
+Run [`Demo.kt`](./src/main/kotlin/duckchess/Demo.kt) with at least 1G of heap.
+
+
 # Algorithm
 If you try to apply a Minimax algorithm from a chess engine to the Duck Chess variant,
 in a naive way,
 you will quickly experience an explosion of tree size, caused by the large number of possible duck moves.
 
-This algorithm shows a 
 
 ## Duck Chess Minimax
 
