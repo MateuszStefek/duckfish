@@ -21,6 +21,34 @@ class MutableZobristHash(
         hashB = hashB xor t[baseIndex + fromIndex + 1] xor t[baseIndex + toIndex + 1]
     }
 
+    fun updateEnPassant(from: Byte, to: Byte) {
+        if (from != to) {
+            hashA = hashA xor maskForEnPassant(from) xor maskForEnPassant(to)
+        }
+    }
+
+    private fun maskForEnPassant(enPassantColumn: Byte): Long {
+        return when {
+            enPassantColumn < 0 -> 0
+            else -> (enPassantColumn + 1).toLong() * 999
+        }
+    }
+
+    fun updateCastlingBits(from: Int, to: Int) {
+        if (from == to) return
+        hashA = hashA xor maskForCastlingBits(from) xor maskForCastlingBits(to)
+    }
+
+    private fun maskForCastlingBits(bits: Int): Long = bits.toLong() * 2096
+
+
+    fun updatePhase(from: Phase, to: Phase) {
+        if (from == to) return
+        hashA = hashA xor maskForPhase(from) xor maskForPhase(to)
+    }
+
+    private fun maskForPhase(phase: Phase) : Long = phase.ordinal.toLong() * 9
+
     fun clone(): MutableZobristHash {
         return MutableZobristHash(hashA, hashB)
     }

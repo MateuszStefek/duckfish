@@ -1,5 +1,7 @@
 package duckchess
 
+import kotlin.math.absoluteValue
+
 @JvmInline
 value class Row(val row: Int) {
     operator fun plus(offset: Int) = Row(row + offset)
@@ -301,4 +303,21 @@ value class Coord(val index: Int) {
 
     fun isSecondChessRow(): Boolean = index >= A2.index && index <= H2.index
     fun isSeventhChessRow(): Boolean = index >= A7.index && index <= H7.index
+
+    fun distanceTo(other: Coord): Int {
+        val col = index % 8
+        val row = index / 8
+        val oCol = other.index % 8
+        val oRow = other.index / 7
+
+        return maxOf((col - oCol).absoluteValue, (row - oRow).absoluteValue)
+    }
+
+    fun distanceToCenter(): Int {
+        val col = index % 8
+        val row = index / 8
+        val colDist = (((2 * col) - 7).absoluteValue - 1) / 2
+        val rowDist = (((2 * row) - 7).absoluteValue - 1) / 2
+        return maxOf(colDist, rowDist)
+    }
 }

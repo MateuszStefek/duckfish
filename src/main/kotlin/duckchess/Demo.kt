@@ -1,6 +1,5 @@
 package duckchess
 
-import duckchess.Coord.Companion.D2
 import java.time.Duration
 import kotlin.system.measureTimeMillis
 
@@ -18,7 +17,7 @@ fun play(initialBoard: Board) {
 
         val selected: SelectedMove
         val millis = measureTimeMillis {
-            selected = minMax.bestMove(currentBoard, Duration.ofSeconds(5))
+            selected = minMax.bestMove(currentBoard, Duration.ofSeconds(15))
         }
 
         //System.gc()
@@ -28,7 +27,8 @@ fun play(initialBoard: Board) {
 
         println(
             "Moving: $moveNumber. ${selected.text(currentBoard)}," +
-                " evaluated positions: ${minMax.counter}" +
+                " evaluated positions: ${minMax.staticEvalCount}" +
+                " visited nodes: ${minMax.visitedNodes}" +
                 " evaluated in ${millis}ms " +
                 " memUsage:$memUsage" +
                 " cache: ${minMax.transpositionCache.maxSize}"
@@ -55,8 +55,70 @@ fun main() {
     board = DuckMove.of(Coord.E6).moveAt(board)
     board = KnightSimpleMove.of(Coord.B8, Coord.C6).moveAt(board)
     board = DuckMove.of(Coord.E2).moveAt(board)
-    board = PawnOneStepMove.of(D2, Coord.D3).moveAt(board)
+    board = PawnOneStepMove.of(Coord.D2, Coord.D3).moveAt(board)
     board = DuckMove.of(Coord.F6).moveAt(board)
+
+/*    board = parseBoard("""
+        ----------------- *
+        |r| |b|q|k|b|X|r|
+        -----------------
+        |p|n|p|p|p|p|p|p|
+        -----------------
+        | | | | | | | | |
+        -----------------
+        | |N| | | | | |Q|
+        -----------------
+        | |P| | |P| | | |
+        -----------------
+        | | | |P|B| | | |
+        -----------------
+        |P| |P| | |P|P|P|
+        -----------------
+        |R| | | |K|B|N|R|
+        ----------------- ep: -1
+    """.trimIndent())*/
+
+    /*board = parseBoard("""
+        ----------------- *
+        | | | | | | | | |
+        -----------------
+        | | |n| | | | | |
+        -----------------
+        | | | | | | | | |
+        -----------------
+        | | |X| | | | | |
+        -----------------
+        | | |k| | | | | |
+        -----------------
+        | | | | | | | | |
+        -----------------
+        | | | | |K| | | |
+        -----------------
+        | | | | | | | | |
+        ----------------- ep: -1
+    """.trimIndent())*/
+
+/*
+    board = parseBoard("""
+        ----------------- *
+        | | | | | | | | |
+        -----------------
+        | | | | |b| |k|X|
+        -----------------
+        | | |q| | | | |p|
+        -----------------
+        | |R|p| |p|N|p|P|
+        -----------------
+        |P| | |r| | | |R|
+        -----------------
+        | | | |P| | | | |
+        -----------------
+        | | |P| |K|P|B| |
+        -----------------
+        | | | | | | | | |
+        ----------------- ep: -1
+    """.trimIndent())
+*/
 
     play(board)
 }

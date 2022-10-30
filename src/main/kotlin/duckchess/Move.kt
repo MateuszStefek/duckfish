@@ -22,6 +22,7 @@ import duckchess.Piece.Companion.BLACK_ROOK
 import duckchess.Piece.Companion.EMPTY
 import duckchess.Piece.Companion.WHITE_KING
 import duckchess.Piece.Companion.WHITE_ROOK
+import java.lang.IllegalStateException
 
 sealed interface Move {
     fun text(board: Board): String
@@ -94,10 +95,7 @@ sealed interface Move {
     fun internalMoveImpl(board: Board, block: () -> Unit)
 
     fun moveAndRevert(board: Board, block: () -> Unit) {
-        val whiteShortCastlingAllowed = board.whiteShortCastlingAllowed
-        val whiteLongCastlingAllowed = board.whiteLongCastlingAllowed
-        val blackShortCastlingAllowed = board.blackShortCastlingAllowed
-        val blackLongCastlingAllowed = board.blackLongCastlingAllowed
+        val castlingBitsOriginal = board.castlingBitsPublic
         val enPassantColumn = board.enPassantColumn
         val phase = board.phase
         val result = board.result
@@ -106,15 +104,15 @@ sealed interface Move {
 
         board.phase = board.nextPhase()
 
-        internalMoveImpl(board, block)
+        try {
+            internalMoveImpl(board, block)
+        } finally {
 
-        board.whiteShortCastlingAllowed = whiteShortCastlingAllowed
-        board.whiteLongCastlingAllowed = whiteLongCastlingAllowed
-        board.blackShortCastlingAllowed = blackShortCastlingAllowed
-        board.blackLongCastlingAllowed = blackLongCastlingAllowed
-        board.enPassantColumn = enPassantColumn
-        board.phase = phase
-        board.result = result
+            board.castlingBitsPublic = castlingBitsOriginal
+            board.enPassantColumn = enPassantColumn
+            board.phase = phase
+            board.result = result
+        }
     }
 }
 
@@ -136,10 +134,12 @@ interface SimpleMove : Move {
         board[to] = piece
         updateCastlingRights(board, from)
 
-        block()
-
-        board[from] = piece
-        board[to] = EMPTY
+        try {
+            block()
+        } finally {
+            board[from] = piece
+            board[to] = EMPTY
+        }
     }
 }
 
@@ -162,10 +162,17 @@ interface CaptureMove : Move {
         updateCastlingRights(board, from)
         updateCastlingRights(board, to)
 
-        block()
+        board.elementsLeft--
 
-        board[from] = piece
-        board[to] = capturedPiece
+        try {
+            block()
+
+        } finally {
+
+            board.elementsLeft++
+            board[from] = piece
+            board[to] = capturedPiece
+        }
     }
 }
 
@@ -309,6 +316,20 @@ class KingSimpleMove private constructor(override val from: Coord, override val 
         }
     }
 
+    override fun internalMoveImpl(board: Board, block: () -> Unit) {
+        val piece = board[from]
+        board[from] = EMPTY
+        board[to] = piece
+        updateCastlingRights(board, from)
+
+        try {
+            block()
+        } finally {
+            board[from] = piece
+            board[to] = EMPTY
+        }
+    }
+
     override fun blockedByDuckAt(duckPos: Coord): Boolean = duckPos == to
 }
 
@@ -374,9 +395,12 @@ class PawnTwoStepMove private constructor(val from: Coord, val to: Coord) : Move
         board[to] = piece
         board.enPassantColumn = (from.index % 8).toByte()
 
-        block()
-        board[from] = piece
-        board[to] = EMPTY
+        try {
+            block()
+        } finally {
+            board[from] = piece
+            board[to] = EMPTY
+        }
     }
 }
 
@@ -425,11 +449,17 @@ class EnPassantMove private constructor(override val from: Coord, override val t
         val dest = if (piece == Piece.WHITE_PAWN) to.oneUp() else to.oneDown()
         board[dest] = piece
 
-        block()
+        board.elementsLeft--
 
-        board[from] = piece
-        board[to] = capturedPiece
-        board[dest] = EMPTY
+        try {
+            block()
+        } finally {
+            board.elementsLeft--
+
+            board[from] = piece
+            board[to] = capturedPiece
+            board[dest] = EMPTY
+        }
     }
 }
 
@@ -465,10 +495,16 @@ class PawnCapturePromotionMove(val from: Coord, val to: Coord, val newPiece: Pie
         updateCastlingRights(board, to)
         board.result = Move.newResultAfterCapture(capturedPiece)
 
-        block()
+        board.elementsLeft--
 
-        board[from] = piece
-        board[to] = capturedPiece
+        try {
+            block()
+        } finally {
+            board.elementsLeft++
+
+            board[from] = piece
+            board[to] = capturedPiece
+        }
     }
 }
 
@@ -489,12 +525,16 @@ class WhiteShortCastleMove private constructor() : Move {
 
         board.whiteShortCastlingAllowed = false
         board.whiteLongCastlingAllowed = false
-        block()
 
-        board[E1] = WHITE_KING
-        board[F1] = EMPTY
-        board[G1] = EMPTY
-        board[H1] = WHITE_ROOK
+        try {
+            block()
+        } finally {
+
+            board[E1] = WHITE_KING
+            board[F1] = EMPTY
+            board[G1] = EMPTY
+            board[H1] = WHITE_ROOK
+        }
     }
 }
 
@@ -516,13 +556,17 @@ class WhiteLongCastleMove private constructor() : Move {
 
         board.whiteShortCastlingAllowed = false
         board.whiteLongCastlingAllowed = false
-        block()
 
-        board[A1] = WHITE_ROOK
-        board[B1] = EMPTY
-        board[C1] = EMPTY
-        board[D1] = EMPTY
-        board[E1] = WHITE_KING
+        try {
+            block()
+        } finally {
+            board[A1] = WHITE_ROOK
+            board[B1] = EMPTY
+            board[C1] = EMPTY
+            board[D1] = EMPTY
+            board[E1] = WHITE_KING
+        }
+
     }
 }
 
@@ -536,6 +580,10 @@ class BlackShortCastleMove private constructor() : Move {
     override fun blockedByDuckAt(duckPos: Coord): Boolean = duckPos == G8 || duckPos == F8
 
     override fun internalMoveImpl(board: Board, block: () -> Unit) {
+        if (board[E8] != BLACK_KING) {
+            throw IllegalStateException()
+        }
+
         board[E8] = EMPTY
         board[F8] = BLACK_ROOK
         board[G8] = BLACK_KING
@@ -543,12 +591,15 @@ class BlackShortCastleMove private constructor() : Move {
 
         board.blackShortCastlingAllowed = false
         board.blackLongCastlingAllowed = false
-        block()
 
-        board[E8] = BLACK_KING
-        board[F8] = EMPTY
-        board[G8] = EMPTY
-        board[H8] = BLACK_ROOK
+        try {
+            block()
+        } finally {
+            board[E8] = BLACK_KING
+            board[F8] = EMPTY
+            board[G8] = EMPTY
+            board[H8] = BLACK_ROOK
+        }
     }
 }
 
@@ -562,6 +613,10 @@ class BlackLongCastleMove private constructor() : Move {
     override fun blockedByDuckAt(duckPos: Coord): Boolean = duckPos == B8 || duckPos == C8 || duckPos == D8
 
     override fun internalMoveImpl(board: Board, block: () -> Unit) {
+        if (board[E8] != BLACK_KING) {
+            throw IllegalStateException()
+        }
+
         board[A8] = EMPTY
         board[B8] = EMPTY
         board[C8] = BLACK_KING
@@ -570,13 +625,16 @@ class BlackLongCastleMove private constructor() : Move {
 
         board.blackShortCastlingAllowed = false
         board.blackLongCastlingAllowed = false
-        block()
 
-        board[A8] = BLACK_ROOK
-        board[B8] = EMPTY
-        board[C8] = EMPTY
-        board[D8] = EMPTY
-        board[E8] = BLACK_KING
+        try {
+            block()
+        } finally {
+            board[A8] = BLACK_ROOK
+            board[B8] = EMPTY
+            board[C8] = EMPTY
+            board[D8] = EMPTY
+            board[E8] = BLACK_KING
+        }
     }
 }
 
@@ -601,12 +659,14 @@ class DuckMove private constructor(val to: Coord) : Move {
         board[to] = Piece.DUCK
         board.duckPosition = to
 
-        block()
-
-        board[to] = EMPTY
-        if (currentDuckPos != null) {
-            board[currentDuckPos] = Piece.DUCK
+        try {
+            block()
+        } finally {
+            board[to] = EMPTY
+            if (currentDuckPos != null) {
+                board[currentDuckPos] = Piece.DUCK
+            }
+            board.duckPosition = currentDuckPos
         }
-        board.duckPosition = currentDuckPos
     }
 }

@@ -2,12 +2,12 @@ package duckchess
 
 import kotlin.math.absoluteValue
 
-class TranspositionCache<SCORE>(val maxSize: Int = 15_000_000) {
+class TranspositionCache<SCORE>(val maxSize: Int = 7_000_000) {
     val cache: Array<CacheEntry<SCORE>> = Array(maxSize) {
         CacheEntry(0, 0, 0, null, 0, 0)
     }
 
-    class CacheEntry<SCORE>(
+    data class CacheEntry<SCORE>(
         var hashA: Long,
         var hashB: Long,
         var remainingDepth: Int,
@@ -28,15 +28,8 @@ class TranspositionCache<SCORE>(val maxSize: Int = 15_000_000) {
         matching: (CacheEntry<SCORE>) -> Unit,
         nonMatching: (CacheEntry<SCORE>, Long, Long) -> Unit
     ) {
-        var hashA = board.zobristHash.hashA
-        var hashB = board.zobristHash.hashB
-        // TODO include these inside the zobrist hash
-        if (board.whiteShortCastlingAllowed) hashA = hashA xor 1
-        if (board.whiteLongCastlingAllowed) hashA = hashA xor 2
-        if (board.blackShortCastlingAllowed) hashA = hashA xor 4
-        if (board.blackLongCastlingAllowed) hashA = hashA xor 8
-        if (board.enPassantColumn >= 0) hashA = hashA xor (board.enPassantColumn.toLong() * 16)
-        hashB = hashB xor board.phase.ordinal.toLong() * 999
+        val hashA = board.zobristHash.hashA
+        val hashB = board.zobristHash.hashB
 
         val bucket: Int = (hashA.toInt() % maxSize).absoluteValue
         if (bucket < 0 || bucket >= maxSize) throw IllegalStateException("$hashA")
@@ -69,12 +62,14 @@ class TranspositionCache<SCORE>(val maxSize: Int = 15_000_000) {
                 }
             },
             nonMatching = { cacheEntry, hashA, hashB ->
-                cacheEntry.hashA = hashA
-                cacheEntry.hashB = hashB
-                cacheEntry.remainingDepth = remainingDepth
-                cacheEntry.score = score
-                cacheEntry.alpha = alpha
-                cacheEntry.beta = beta
+                /*if (cacheEntry.score == null || cacheEntry.remainingDepth < remainingDepth) {*/
+                    cacheEntry.hashA = hashA
+                    cacheEntry.hashB = hashB
+                    cacheEntry.remainingDepth = remainingDepth
+                    cacheEntry.score = score
+                    cacheEntry.alpha = alpha
+                    cacheEntry.beta = beta
+                /*}*/
             })
     }
 

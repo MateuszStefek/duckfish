@@ -21,6 +21,24 @@ value class Piece(val code: Byte) {
         val BLACK_ROOK = Piece(11)
         val WHITE_PAWN = Piece(12)
         val BLACK_PAWN = Piece(13)
+
+        fun fromText(text: String): Piece = when (text) {
+            " " -> Piece.EMPTY
+            DUCK.text() -> DUCK
+            WHITE_BISHOP.text() -> WHITE_BISHOP
+            BLACK_BISHOP.text() -> BLACK_BISHOP
+            WHITE_KNIGHT.text() -> WHITE_KNIGHT
+            BLACK_KNIGHT.text() -> BLACK_KNIGHT
+            WHITE_QUEEN.text() -> WHITE_QUEEN
+            BLACK_QUEEN.text() -> BLACK_QUEEN
+            WHITE_KING.text() -> WHITE_KING
+            BLACK_KING.text() -> BLACK_KING
+            WHITE_ROOK.text() -> WHITE_ROOK
+            BLACK_ROOK.text() -> BLACK_ROOK
+            WHITE_PAWN.text() -> WHITE_PAWN
+            BLACK_PAWN.text() -> BLACK_PAWN
+            else -> throw IllegalArgumentException(text)
+        }
     }
 
     fun isWhite() = code > 1 && (code and 1) == 0.toByte()

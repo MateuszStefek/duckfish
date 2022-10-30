@@ -10,6 +10,14 @@ class Evaluator {
         var coordA: Coord? = null
         var coordB: Coord? = null
 
+        var whitePawns = 0
+        var blackPawns = 0
+        var whiteFigures = 0
+        var blackFigures = 0
+
+        var whiteKing: Coord = Coord(0)
+        var blackKing: Coord = Coord(0)
+
         Coord.forEach { pos ->
             val piece = board[pos]
 
@@ -21,8 +29,18 @@ class Evaluator {
                 }
             } else {
                 score += pieceScore(piece, pos, board)
+                when {
+                    piece == Piece.WHITE_PAWN -> whitePawns++
+                    piece == Piece.BLACK_PAWN -> blackPawns++
+                    piece == Piece.WHITE_KING -> whiteKing = pos
+                    piece == Piece.BLACK_KING -> blackKing = pos
+                    piece.isBlack() -> blackFigures++
+                    piece.isWhite() -> whiteFigures++
+                }
             }
         }
+
+        score += materialPotentialScore(whiteFigures, whitePawns, blackFigures, blackPawns, whiteKing, blackKing)
 
         val tempoBonus = 12
 
@@ -94,6 +112,45 @@ class Evaluator {
             if (board[pos.twoDown()] == Piece.BLACK_PAWN) {
                 score -= 16
             }
+        }
+
+        return score
+    }
+
+    private fun materialPotentialScore(whiteFigures: Int, whitePawns: Int, blackFigures: Int, blackPawns: Int,
+        whiteKing: Coord, blackKing: Coord): Int {
+        if (blackFigures == 0 && whiteFigures == 0) {
+            if (whitePawns > blackPawns + 1) {
+                return 200
+            }
+            if (blackPawns > whitePawns + 1) {
+                return -200
+            }
+        }
+
+        var score = 0
+        if (whiteFigures == 0 && whitePawns == 0) {
+            score -= 666
+            score += whiteKing.distanceTo(blackKing)
+            score -= 3 * whiteKing.distanceToCenter()
+        }
+        if (blackFigures == 0 && blackPawns == 0) {
+            score += 666
+            score -= whiteKing.distanceTo(blackKing)
+            score += 3 * blackKing.distanceToCenter()
+        }
+        if (blackPawns == 0) {
+            score += 50
+        }
+        if (whitePawns == 0) {
+            score -= 50
+        }
+
+        if (whiteFigures >= 2 && blackFigures == 0) {
+            score += 200
+        }
+        if (blackFigures >= 2 && whiteFigures == 0) {
+            score -= 200
         }
 
         return score
