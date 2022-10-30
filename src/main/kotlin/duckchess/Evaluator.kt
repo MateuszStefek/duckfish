@@ -7,8 +7,8 @@ class Evaluator {
         evaluatedPositionsCounter++
 
         var score: Int = 0
-        var coordA: Coord? = null
-        var coordB: Coord? = null
+        var coordA: Coord = Coord(-1)
+        var coordB: Coord = Coord(-1)
 
         var whitePawns = 0
         var blackPawns = 0
@@ -22,9 +22,9 @@ class Evaluator {
             val piece = board[pos]
 
             if (piece == Piece.EMPTY) {
-                if (coordA == null) {
+                if (coordA.index == -1) {
                     coordA = pos
-                } else if (coordB == null) {
+                } else if (coordB.index == -1) {
                     coordB = pos
                 }
             } else {
@@ -117,8 +117,14 @@ class Evaluator {
         return score
     }
 
-    private fun materialPotentialScore(whiteFigures: Int, whitePawns: Int, blackFigures: Int, blackPawns: Int,
-        whiteKing: Coord, blackKing: Coord): Int {
+    private fun materialPotentialScore(
+        whiteFigures: Int,
+        whitePawns: Int,
+        blackFigures: Int,
+        blackPawns: Int,
+        whiteKing: Coord,
+        blackKing: Coord
+    ): Int {
         if (blackFigures == 0 && whiteFigures == 0) {
             if (whitePawns > blackPawns + 1) {
                 return 200

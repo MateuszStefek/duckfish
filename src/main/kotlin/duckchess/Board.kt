@@ -141,7 +141,7 @@ class Board private constructor(
                 phaseVal = Phase.WHITE_PIECE_MOVE,
                 castlingBits = 0,
                 duckPosition = null,
-                zobristHash = MutableZobristHash(0, 0),
+                zobristHash = MutableZobristHash(0/*, 0*/),
                 elementsLeft = 0
             )
 
@@ -259,7 +259,7 @@ class Board private constructor(
         from.down { to -> moveThrough(from, to, RookSimpleMove::of, RookCaptureMove::of, consumer, areWeWhite) }
     }
 
-    private fun queenMoves(from: Coord, consumer: (Move) -> Unit, areWeWhite: Boolean) {
+    private inline fun queenMoves(from: Coord, noinline consumer: (Move) -> Unit, areWeWhite: Boolean) {
         bishopMoves(from, consumer, areWeWhite)
         rookMoves(from, consumer, areWeWhite)
     }
@@ -315,17 +315,14 @@ class Board private constructor(
         } else {
             // seventh row
             if (get(oneUp) == EMPTY) {
-                consumer(PawnPromotionMove(from, oneUp, WHITE_KNIGHT))
-                consumer(PawnPromotionMove(from, oneUp, WHITE_BISHOP))
-                consumer(PawnPromotionMove(from, oneUp, WHITE_ROOK))
-                consumer(PawnPromotionMove(from, oneUp, WHITE_QUEEN))
+                consumer(PawnPromotionMove.of(from, oneUp, WHITE_QUEEN))
+                // In Duck Chess, there's never a reason to promote to a Rook or to a Bishop
+                consumer(PawnPromotionMove.of(from, oneUp, WHITE_KNIGHT))
             }
             from.iWhitePawnCaptures { captureSquare ->
                 if (get(captureSquare).isBlack()) {
-                    consumer(PawnCapturePromotionMove(from, captureSquare, WHITE_KNIGHT))
-                    consumer(PawnCapturePromotionMove(from, captureSquare, WHITE_BISHOP))
-                    consumer(PawnCapturePromotionMove(from, captureSquare, WHITE_ROOK))
-                    consumer(PawnCapturePromotionMove(from, captureSquare, WHITE_QUEEN))
+                    consumer(PawnCapturePromotionMove.of(from, captureSquare, WHITE_QUEEN))
+                    consumer(PawnCapturePromotionMove.of(from, captureSquare, WHITE_KNIGHT))
                 }
             }
         }
@@ -353,17 +350,14 @@ class Board private constructor(
             }
         } else {
             if (get(oneDown) == EMPTY) {
-                consumer(PawnPromotionMove(from, oneDown, BLACK_KNIGHT))
-                consumer(PawnPromotionMove(from, oneDown, BLACK_BISHOP))
-                consumer(PawnPromotionMove(from, oneDown, BLACK_ROOK))
-                consumer(PawnPromotionMove(from, oneDown, BLACK_QUEEN))
+                consumer(PawnPromotionMove.of(from, oneDown, BLACK_QUEEN))
+                // In Duck Chess, there's never a reason to promote to a Rook or to a Bishop
+                consumer(PawnPromotionMove.of(from, oneDown, BLACK_KNIGHT))
             }
             from.iBlackPawnCaptures { captureSquare ->
                 if (get(captureSquare).isWhite()) {
-                    consumer(PawnCapturePromotionMove(from, captureSquare, BLACK_KNIGHT))
-                    consumer(PawnCapturePromotionMove(from, captureSquare, BLACK_BISHOP))
-                    consumer(PawnCapturePromotionMove(from, captureSquare, BLACK_ROOK))
-                    consumer(PawnCapturePromotionMove(from, captureSquare, BLACK_QUEEN))
+                    consumer(PawnCapturePromotionMove.of(from, captureSquare, BLACK_QUEEN))
+                    consumer(PawnCapturePromotionMove.of(from, captureSquare, BLACK_KNIGHT))
                 }
             }
         }

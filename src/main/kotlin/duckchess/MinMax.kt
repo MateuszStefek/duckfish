@@ -31,14 +31,42 @@ data class BoardEval(
     val duckPosB: Coord,
 
     val moveA: Move? = null,
-    val duckMoveA: Coord? = null
+    val duckMoveA: Coord = Coord.A1,
+    val moveB: Move? = null
 
 ) {
+    companion object {
+        val weHaveJustLostBoardEval: BoardEval = BoardEval(
+            -winsScore(),
+            Coord.A1,
+            -winsScore(),
+            Coord.B1
+        )
+    }
     override fun toString(): String {
         return "BoardEval(A=$scoreA@${duckPosA.text()},B=$scoreB@${duckPosB.text()})"
     }
+}
 
-    fun negated() = copy(scoreA = -scoreA, scoreB = -scoreB)
+data class MutableBoardEval(
+    var scoreA: Int = 0,
+    var duckPosA: Coord = Coord.A1,
+    var scoreB: Int = 0,
+    var duckPosB: Coord = Coord.A1,
+
+    var moveA: Move? = null,
+    var duckMoveA: Coord = Coord.A1,
+    var moveB: Move? = null
+) {
+    fun toImmutable() = BoardEval(
+        scoreA = scoreA,
+        duckPosA = duckPosA,
+        scoreB = scoreB,
+        duckPosB = duckPosB,
+        moveA = moveA,
+        duckMoveA = duckMoveA,
+        moveB = moveB
+    )
 }
 
 data class SelectedMove(val move: Move, val duckMove: DuckMove, val score: Int, val depth: Int) {
@@ -63,9 +91,9 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
     val transpositionCache = TranspositionCache<BoardEval>()
     val finalHorizontDepth = 3
     private val scoredCordSetPool: ScoredCordSetPool = ScoredCordSetPool()
-    private val moveWitScoreArrayPool = MoveScoreArrayPool()
+    private val moveWithScoreArrayPool = MoveScoreArrayPool()
 
-    fun bestMove(boardArg: Board, duration: Duration): SelectedMove {
+    fun bestMove(boardArg: Board, duration: Duration, maximumMaxDepth: Int = 100): SelectedMove {
         staticEvalCount = 0
         visitedNodes = 0
 
@@ -81,9 +109,18 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
                 println("Best move at depth ${maxDepth}: ${selectedMove.text(board)}")
 
                 if (isDecisiveScore(selectedMove.score)) {
-                    println("Game solved at depth ${maxDepth}")
-                    return selectedMove!!
+                    // If at Ply7 we evaluate to K8, we don't need to evaluate at Ply8
+                    if (winsScore() - selectedMove.score.absoluteValue <= maxDepth + 1) {
+                        println("Game solved at depth ${maxDepth}")
+                        return selectedMove
+                    }
                 }
+
+                if (maxDepth >= maximumMaxDepth) {
+                    println("maximum allowed depth reached (${maximumMaxDepth}")
+                    return selectedMove
+                }
+
 
                 val endThisDepth = Instant.now()
                 val durationThisDepth = Duration.between(startThisDepth, endThisDepth)
@@ -91,7 +128,7 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
                 maxDepth++
                 if (Instant.now().plus(durationThisDepth.dividedBy(4)).isAfter(cutOffTime)) {
                     println("Giving up on evaluating at depth ${maxDepth}")
-                    return selectedMove!!
+                    return selectedMove
                 }
             } catch (e: Stop) {
                 println("Time has run out at depth ${maxDepth}")
@@ -116,7 +153,7 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
         val board: Board,
         private val alphaArg: Int = -99_999,
         private val beta: Int = 99_999,
-        private val immediateBeta: BoardEval = BoardEval(
+        private val immediateBeta: MutableBoardEval = MutableBoardEval(
             scoreA = Integer.MIN_VALUE + 10,
             Coord.A1,
             scoreB = Integer.MIN_VALUE + 10,
@@ -132,6 +169,7 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
     ) {
 
         private var bestMoveFromCache: Move? = null
+        private var secondBestMoveFromCache: Move? = null
         private var alpha: Int = alphaArg
 
         init {
@@ -162,7 +200,7 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
 
             if (remainingDepth > finalHorizontDepth) checkTimeout()
 
-            var cacheEntry = transpositionCache.get(board)
+            val cacheEntry = transpositionCache.get(board)
             if (cacheEntry != null && cacheEntry.remainingDepth >= remainingDepth) {
                 debug { "Cached entry: ${cacheEntry}" }
 
@@ -182,6 +220,7 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
                 }
             }
             this.bestMoveFromCache = cacheEntry?.score?.moveA
+            this.secondBestMoveFromCache = cacheEntry?.score?.moveB
 
 
 
@@ -196,7 +235,7 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
             }
         }
         private fun evaluateRecursively(areWeWhite: Boolean, scoredCoordSet: ScoredCoordSet): BoardEval? {
-            return moveWitScoreArrayPool.withMoveScoreArray { allMovesArray ->
+            return moveWithScoreArrayPool.withMoveScoreArray { allMovesArray ->
                 val moveCount = generateMoves(allMovesArray)
                 evaluateMovesRecursively(areWeWhite, scoredCoordSet, allMovesArray, moveCount)
             }
@@ -209,82 +248,99 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
             moveCount: Int
         ): BoardEval? {
 
-            var currentEval = scoredCoordSet.bottomTwo()
+            var currentEval: MutableBoardEval = scoredCoordSet.getBottomTwo()
 
             val nextPhase = if (areWeWhite) Phase.BLACK_PIECE_MOVE else Phase.WHITE_PIECE_MOVE
 
             val boardWithoutDuck = board.withoutDuck()
 
+            /*
+             * Trick to avoid multiple allocations of the lambda passed to move.moveAndRevert
+             */
+            val moveAnalyser = object: () -> Unit {
+                private lateinit var move: Move
+
+                fun analyze(move: Move) {
+                    this.move = move
+                    move.moveAndRevert(boardWithoutDuck, this)
+                }
+
+                override fun invoke() {
+                    boardWithoutDuck.phase = nextPhase
+
+                    val nextRemainingDepth = when {
+                        remainingDepth == 1 -> 0
+                        remainingDepth <= finalHorizontDepth && (move is CaptureMove || move is PawnPromotionMove) -> remainingDepth - 1
+                        else -> maxOf(0, remainingDepth - finalHorizontDepth)
+                    }
+
+                    val moveEval = NodeEvaluation(
+                        board = boardWithoutDuck,
+                        remainingDepth = nextRemainingDepth,
+                        alphaArg = negForward(beta),
+                        beta = negForward(alpha),
+                        immediateBeta = currentEval,
+                        areWeWhite = !areWeWhite
+                    ).negMax()
+
+                    debug { "${move.text(board)} eval returned from child: ${moveEval}" }
+                    if (moveEval != null) {
+                        scoredCoordSet.update(
+                            atLeast = minOf(beta + 1, negScore(moveEval.scoreA)),
+                            exceptBlockingMove = move,
+                            exceptCoord = moveEval.duckPosA,
+                            newSelectedMove = move,
+                            newDuckMove = moveEval.duckPosA
+                        )
+                        scoredCoordSet.update(
+                            atLeast = minOf(beta + 1, negScore(moveEval.scoreB)),
+                            exceptBlockingMove = move,
+                            exceptCoord = moveEval.duckPosB,
+                            newSelectedMove = move,
+                            newDuckMove = moveEval.duckPosB
+                        )
+                        currentEval = scoredCoordSet.getBottomTwo()
+
+                        alpha = maxOf(alpha, currentEval.scoreA)
+                    }
+
+                    if (bestMovePreviousDepth == move) {
+                        bestMovePreviousDepthAnalysed = true
+                    }
+
+                }
+            }
+
             try {
                 var moveI = 0
                 while (moveI < moveCount) {
-                    val move = allMovesArray[moveI].move
-                    moveI++
+                    val move = allMovesArray[moveI++].move
 
-                    var shouldReturnNull = false
+                    if (currentEval.scoreA >= -immediateBeta.scoreA) {
+                        debug { "${move.text(board)} cut-off A" }
+                        return@evaluateMovesRecursively null
+                    }
+                    if (currentEval.duckPosA == immediateBeta.duckPosA) {
+                        if (currentEval.scoreB > -immediateBeta.scoreA) {
+                            debug { "${move.text(board)} cut-off B" }
+                            return@evaluateMovesRecursively null
+                        }
+                    }
+
 
                     debug { "Evaluating ${move.text(board)} alpha=${alpha} beta=${beta} wscA =${boardWithoutDuck.whiteShortCastlingAllowed}" }
 
-                    move.moveAndRevert(boardWithoutDuck) {
-                        debug { "after move wsca=${boardWithoutDuck.whiteShortCastlingAllowed}" }
-
-                        boardWithoutDuck.phase = nextPhase
-
-                        if (currentEval.scoreA >= -immediateBeta.scoreA) {
-                            debug { "${move.text(board)} cut-off A" }
-                            shouldReturnNull = true
-                            return@moveAndRevert
-                        }
-                        if (currentEval.duckPosA == immediateBeta.duckPosA) {
-                            if (currentEval.scoreB > -immediateBeta.scoreA) {
-                                debug { "${move.text(board)} cut-off B" }
-                                shouldReturnNull = true
-                                return@moveAndRevert
-                            }
-                        }
-
-                        val nextRemainingDepth = when {
-                            remainingDepth == 1 -> 0
-                            remainingDepth <= finalHorizontDepth && move is CaptureMove -> remainingDepth - 1
-                            else -> maxOf(0, remainingDepth - finalHorizontDepth)
-                        }
-
-                        val moveEval = NodeEvaluation(
-                            board = boardWithoutDuck,
-                            remainingDepth = nextRemainingDepth,
-                            alphaArg = negForward(beta),
-                            beta = negForward(alpha),
-                            immediateBeta = currentEval,
-                            areWeWhite = !areWeWhite
-                        ).negMax()
-
-                        debug { "${move.text(board)} eval returned from child: ${moveEval}" }
-                        if (moveEval != null) {
-                            scoredCoordSet.update(
-                                minOf(beta + 1, negScore(moveEval.scoreA)),
-                                predicate = { coord -> coord != moveEval.duckPosA && !move.blockedByDuckAt(coord) },
-                                move, moveEval.duckPosA
-                            )
-                            scoredCoordSet.update(
-                                minOf(beta + 1, negScore(moveEval.scoreB)),
-                                predicate = { coord -> coord != moveEval.duckPosB && !move.blockedByDuckAt(coord) },
-                                move, moveEval.duckPosB
-                            )
-                            currentEval = scoredCoordSet.bottomTwo()
-
-                            alpha = maxOf(alpha, currentEval.scoreA)
-                        }
-                    }
+                    moveAnalyser.analyze(move)
 
                     debug { " new gA: ${alpha}" }
                     debug { " new s: ${scoredCoordSet.text(board)}" }
 
-                    if (shouldReturnNull) {
-                        return@evaluateMovesRecursively null
-                    }
-
                     if (alpha > beta) {
-                        var prunedScore = scoredCoordSet.bottomTwo().copy(scoreA = alpha, scoreB = alpha)
+                        currentEval = scoredCoordSet.getBottomTwo()
+                        currentEval.scoreA = alpha
+                        currentEval.scoreB = alpha
+
+                        val prunedScore = currentEval.toImmutable()
                         debug { "${move.text(board)} alpha-beta cut off. Returning $prunedScore" }
                         transpositionCache.set(
                             board,
@@ -295,21 +351,17 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
                         )
                         return prunedScore
                     }
-
-                    if (bestMovePreviousDepth == move) {
-                        bestMovePreviousDepthAnalysed = true
-                    }
                 }
             } catch (e: Stop) {
                 if (bestMovePreviousDepth != null && bestMovePreviousDepthAnalysed && board.duckPosition != null) {
                     println(" Time has run out, but the previous best move (${bestMovePreviousDepth.text(board)}) has already been analysed")
-                    return currentEval
+                    return currentEval.toImmutable()
                 } else {
-                    throw e;
+                    throw e
                 }
             }
 
-            val result = scoredCoordSet.bottomTwo()
+            val result = scoredCoordSet.getBottomTwo().toImmutable()
             transpositionCache.set(board, remainingDepth = remainingDepth, score = result, alphaArg, beta)
 
             debug { "Full return ${result}" }
@@ -318,14 +370,14 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
         }
 
         private fun generateMoves(allMoves: Array<MoveWithScore>): Int {
-            var moveCount = 0
+            val moveCount = singletonMoveGeneratorConsumer.generateMoves(board, allMoves)
 
-            board.generateMoves { move ->
-                var strengthEst = moveStrengthEstimation(move, board, areWeWhite)
-                if (move === bestMoveFromCache) strengthEst += 300
-                val mvs = allMoves[moveCount++]
-                mvs.move = move
-                mvs.score = strengthEst
+            var i = 0
+            while (i < moveCount) {
+                val moveWithScore = allMoves[i]
+                val score = moveStrengthEstimation(moveWithScore.move, board, areWeWhite)
+                moveWithScore.score = score
+                i++
             }
 
             allMoves.sort(0, moveCount)
@@ -335,7 +387,7 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
 
 
     private fun checkTimeout() {
-        cutOffTime?.let { if (Instant.now().isAfter(it)) throw Stop() }
+        cutOffTime?.let { if (System.currentTimeMillis() > it.toEpochMilli() ) throw Stop() }
     }
 
 
@@ -381,20 +433,8 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
 
     private fun finalResult(board: Board): BoardEval {
         return when (val result = board.result) {
-            GameResult.WHITE_WON -> BoardEval(
-                -winsScore(),
-                Coord.A1,
-                -winsScore(),
-                Coord.B1
-            )
-
-            GameResult.BLACK_WON -> BoardEval(
-                -winsScore(),
-                Coord.A1,
-                -winsScore(),
-                Coord.B1
-            )
-
+            GameResult.WHITE_WON -> BoardEval.weHaveJustLostBoardEval
+            GameResult.BLACK_WON -> BoardEval.weHaveJustLostBoardEval
             else -> throw IllegalArgumentException("Non-final $result")
         }
     }
@@ -409,7 +449,7 @@ private class MoveScoreArrayPool {
     var nextFree: Int = 0
 
     inline fun <R> withMoveScoreArray(consumer: (Array<MoveWithScore>) -> R): R {
-        var array: Array<MoveWithScore> = t[nextFree++]
+        val array: Array<MoveWithScore> = t[nextFree++]
         try {
             return consumer(array)
         } finally {
@@ -417,3 +457,24 @@ private class MoveScoreArrayPool {
         }
     }
 }
+
+
+private val singletonMoveGeneratorConsumer = object: (Move) -> Unit {
+    var counter = 0
+    var arrayToFill: Array<MoveWithScore> = Array(0) { TODO() }
+    override fun invoke(move: Move) {
+        arrayToFill[counter++].move = move
+    }
+
+    /*
+     * Non thread-safe
+     * Non reentrant-safe
+     */
+    fun generateMoves(board: Board, arrayToFill: Array<MoveWithScore>): Int {
+        counter = 0
+        this.arrayToFill = arrayToFill
+        board.generateMoves(this)
+        return counter
+    }
+}
+

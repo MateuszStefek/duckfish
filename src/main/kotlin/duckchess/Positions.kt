@@ -87,3 +87,27 @@ val bug1Position = Board.apOf(
         // Coord.C3 to duckchess.Piece.BLACK_KNIGHT,
     )
 )
+
+/**
+ * Bug White seen the pawn as a guaranteed capture,
+ * so it never captured it, actually.
+ */
+val positionUndecidedBug = parseBoard("""
+    ----------------- *
+    | | | | | | | | |
+    -----------------
+    | | | | | | | | |
+    -----------------
+    | | | | | | |k| |
+    -----------------
+    | | | | | | |p|R|
+    -----------------
+    | | | | | | |X| |
+    -----------------
+    | | | | |K|B| |P|
+    -----------------
+    | | | | | | | | |
+    -----------------
+    | | | | | | | | |
+    ----------------- ep: -1
+""".trimIndent())

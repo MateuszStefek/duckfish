@@ -250,37 +250,6 @@ value class Coord(val index: Int) {
     fun oneDown(): Coord = Coord(index - 8)
     fun twoDown(): Coord = Coord(index - 16)
 
-    fun oneLeftUp(): Coord? {
-        var col = index % 8
-        if (col > 0) {
-            return Coord(index + 7)
-        }
-        return null
-    }
-
-    fun oneRightUp(): Coord? {
-        var col = index % 8
-        if (col < 7) {
-            return Coord(index + 9)
-        }
-        return null
-    }
-    fun oneLeftDown(): Coord? {
-        var col = index % 8
-        if (col > 0) {
-            return Coord(index - 9)
-        }
-        return null
-    }
-
-    fun oneRightDown(): Coord? {
-        var col = index % 8
-        if (col < 7) {
-            return Coord(index - 7)
-        }
-        return null
-    }
-
     inline fun iWhitePawnCaptures(block: (Coord) -> Unit) {
         val col = index % 8
         if (col < 7) {

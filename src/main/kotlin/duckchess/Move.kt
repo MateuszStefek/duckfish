@@ -463,7 +463,22 @@ class EnPassantMove private constructor(override val from: Coord, override val t
     }
 }
 
-class PawnPromotionMove(val from: Coord, val to: Coord, val newPiece: Piece) : Move {
+class PawnPromotionMove private constructor(val from: Coord, val to: Coord, val newPiece: Piece) : Move {
+    companion object {
+        private val instances = Array<PawnPromotionMove>(64 * 64 * Piece.NUM_VALUES) { idx ->
+            val pieceCode = (idx % Piece.NUM_VALUES).toByte()
+            val coordIndex = idx / Piece.NUM_VALUES
+            val fromIdx = coordIndex / 64
+            val toIdx = coordIndex % 64
+            PawnPromotionMove(Coord(fromIdx), Coord(toIdx), Piece(pieceCode))
+        }
+
+        fun of(from: Coord, to: Coord, piece: Piece): PawnPromotionMove {
+            val coordIndex = from.index * 64 + to.index
+            return instances[coordIndex * Piece.NUM_VALUES + piece.code]
+        }
+    }
+
     override fun text(board: Board) = board[from].let { piece ->
         "${piece.text()}${from.text()}-${to.text()}${newPiece.text()}"
     }
@@ -482,7 +497,22 @@ class PawnPromotionMove(val from: Coord, val to: Coord, val newPiece: Piece) : M
     }
 }
 
-class PawnCapturePromotionMove(val from: Coord, val to: Coord, val newPiece: Piece) : Move {
+class PawnCapturePromotionMove private constructor(val from: Coord, val to: Coord, val newPiece: Piece) : Move {
+    companion object {
+        private val instances = Array<PawnCapturePromotionMove>(64 * 64 * Piece.NUM_VALUES) { idx ->
+            val pieceCode = (idx % Piece.NUM_VALUES).toByte()
+            val coordIndex = idx / Piece.NUM_VALUES
+            val fromIdx = coordIndex / 64
+            val toIdx = coordIndex % 64
+            PawnCapturePromotionMove(Coord(fromIdx), Coord(toIdx), Piece(pieceCode))
+        }
+
+        fun of(from: Coord, to: Coord, piece: Piece): PawnCapturePromotionMove {
+            val coordIndex = from.index * 64 + to.index
+            return instances[coordIndex * Piece.NUM_VALUES + piece.code]
+        }
+    }
+
     override fun text(board: Board) = board[from].let { piece ->
         "${piece.text()}${from.text()}X${to.text()}${newPiece.text()}"
     }

@@ -1,6 +1,7 @@
 package duckchess
 
 import java.time.Duration
+import kotlin.random.Random
 import kotlin.system.measureTimeMillis
 
 fun play(initialBoard: Board) {
@@ -17,7 +18,7 @@ fun play(initialBoard: Board) {
 
         val selected: SelectedMove
         val millis = measureTimeMillis {
-            selected = minMax.bestMove(currentBoard, Duration.ofSeconds(15))
+            selected = minMax.bestMove(currentBoard, Duration.ofSeconds(5 + Random.nextInt(7).toLong()))
         }
 
         //System.gc()
@@ -57,6 +58,10 @@ fun main() {
     board = DuckMove.of(Coord.E2).moveAt(board)
     board = PawnOneStepMove.of(Coord.D2, Coord.D3).moveAt(board)
     board = DuckMove.of(Coord.F6).moveAt(board)
+    board = PawnTwoStepMove.of(Coord.E7, Coord.E5).moveAt(board)
+    board = DuckMove.of(Coord.E7).moveAt(board)
+    board = KnightSimpleMove.of(Coord.G1, Coord.F3).moveAt(board)
+    board = DuckMove.of(Coord.D6).moveAt(board)
 
 /*    board = parseBoard("""
         ----------------- *
@@ -78,24 +83,24 @@ fun main() {
         ----------------- ep: -1
     """.trimIndent())*/
 
-    /*board = parseBoard("""
-        ----------------- *
-        | | | | | | | | |
-        -----------------
-        | | |n| | | | | |
-        -----------------
-        | | | | | | | | |
-        -----------------
-        | | |X| | | | | |
-        -----------------
-        | | |k| | | | | |
-        -----------------
-        | | | | | | | | |
-        -----------------
-        | | | | |K| | | |
-        -----------------
-        | | | | | | | | |
-        ----------------- ep: -1
+/*    board = parseBoard("""
+-----------------
+| | |n|k|b| | | |
+-----------------
+| | | | | | | | |
+-----------------
+| | | | | | | | |
+-----------------
+| | | | | | | | |
+-----------------
+| | |K| | | | | |
+-----------------
+| | | | | | | | |
+-----------------
+| | | | | | | |B|
+-----------------
+| | | |r| | | | |
+----------------- * ep: -1
     """.trimIndent())*/
 
 /*
@@ -119,6 +124,7 @@ fun main() {
         ----------------- ep: -1
     """.trimIndent())
 */
+    //board = positionUndecidedBug
 
     play(board)
 }
