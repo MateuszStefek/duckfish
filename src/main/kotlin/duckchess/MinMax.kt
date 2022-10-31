@@ -257,7 +257,7 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
             /*
              * Trick to avoid multiple allocations of the lambda passed to move.moveAndRevert
              */
-            val moveAnalyser = object: () -> Unit {
+            val moveAnalyser = object: MoveVisitor {
                 private lateinit var move: Move
 
                 fun analyze(move: Move) {
