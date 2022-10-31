@@ -149,6 +149,8 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
     }
 
     private inner class NodeEvaluation(
+        val parentNode: NodeEvaluation? = null,
+        val enteredWithReversibleMove: Boolean = true,
         val remainingDepth: Int,
         val board: Board,
         private val alphaArg: Int = -99_999,
@@ -171,6 +173,8 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
         private var bestMoveFromCache: Move? = null
         private var secondBestMoveFromCache: Move? = null
         private var alpha: Int = alphaArg
+
+        private val hashOfBoard: Long = board.zobristHash.hashA
 
         init {
             visitedNodes++
@@ -199,6 +203,10 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
             }
 
             if (remainingDepth > finalHorizontDepth) checkTimeout()
+
+            if (currentBoardAlreadySeenInCallStack()) {
+                return drawEval(board)
+            }
 
             val cacheEntry = transpositionCache.get(board)
             if (cacheEntry != null && cacheEntry.remainingDepth >= remainingDepth) {
@@ -265,7 +273,7 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
                     move.moveAndRevert(boardWithoutDuck, this)
                 }
 
-                override fun invoke() {
+                override fun invoke(isReversible: Boolean) {
                     boardWithoutDuck.phase = nextPhase
 
                     val nextRemainingDepth = when {
@@ -275,6 +283,8 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
                     }
 
                     val moveEval = NodeEvaluation(
+                        parentNode = this@NodeEvaluation,
+                        enteredWithReversibleMove = isReversible,
                         board = boardWithoutDuck,
                         remainingDepth = nextRemainingDepth,
                         alphaArg = negForward(beta),
@@ -369,6 +379,23 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
             return result
         }
 
+        private fun drawEval(board: Board): BoardEval {
+            var coordA: Coord = Coord(-1)
+            var coordB: Coord = Coord(-1)
+            Coord.forEach { coord ->
+                val piece = board[coord]
+                if (piece == Piece.EMPTY) {
+                if (coordA.index == -1) {
+                    coordA = coord
+                } else if (coordB.index == -1) {
+                    coordB = coord
+                    return@forEach
+                }
+            }}
+
+            return BoardEval(scoreA = 0, duckPosA = coordA, scoreB = 0, duckPosB = coordB)
+        }
+
         private fun generateMoves(allMoves: Array<MoveWithScore>): Int {
             val moveCount = singletonMoveGeneratorConsumer.generateMoves(board, allMoves)
 
@@ -382,6 +409,19 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
 
             allMoves.sort(0, moveCount)
             return moveCount
+        }
+
+        private fun currentBoardAlreadySeenInCallStack(): Boolean {
+            var node: NodeEvaluation = this
+            val currentHash = this.hashOfBoard
+            do {
+                if (!node.enteredWithReversibleMove) return false
+                val parentNode: NodeEvaluation = node.parentNode ?: return false
+                val parentParent: NodeEvaluation = parentNode.parentNode ?: return false
+                if (!parentNode.enteredWithReversibleMove) return false
+                node = parentParent
+                if (node.hashOfBoard == currentHash) return true
+            } while(true)
         }
     }
 

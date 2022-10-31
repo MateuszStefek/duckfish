@@ -24,7 +24,7 @@ import duckchess.Piece.Companion.WHITE_KING
 import duckchess.Piece.Companion.WHITE_ROOK
 import java.lang.IllegalStateException
 
-typealias MoveVisitor = () -> Unit
+typealias MoveVisitor = (isReversible: Boolean) -> Unit
 
 sealed interface Move {
     fun text(board: Board): String
@@ -94,9 +94,9 @@ sealed interface Move {
         return result
     }
 
-    fun internalMoveImpl(board: Board, block: MoveVisitor)
+    fun internalMoveImpl(board: Board,moveVisitor: MoveVisitor)
 
-    fun moveAndRevert(board: Board, block: MoveVisitor) {
+    fun moveAndRevert(board: Board,moveVisitor: MoveVisitor) {
         val castlingBitsOriginal = board.castlingBitsPublic
         val enPassantColumn = board.enPassantColumn
         val phase = board.phase
@@ -107,7 +107,7 @@ sealed interface Move {
         board.phase = board.nextPhase()
 
         try {
-            internalMoveImpl(board, block)
+            internalMoveImpl(board, moveVisitor)
         } finally {
 
             board.castlingBitsPublic = castlingBitsOriginal
@@ -130,14 +130,16 @@ interface SimpleMove : Move {
         return Move.isSlidingMoveBlockedByDuck(from, to, duckPos)
     }
 
-    override fun internalMoveImpl(board: Board, block: MoveVisitor) {
+    override fun internalMoveImpl(board: Board,moveVisitor: MoveVisitor) {
         val piece = board[from]
         board[from] = EMPTY
         board[to] = piece
+        val oldCastlingBits = board.castlingBitsPublic
         updateCastlingRights(board, from)
+        val isReversible: Boolean = oldCastlingBits == board.castlingBitsPublic 
 
         try {
-            block()
+            moveVisitor(isReversible)
         } finally {
             board[from] = piece
             board[to] = EMPTY
@@ -153,7 +155,7 @@ interface CaptureMove : Move {
         "${piece.text()}${from.text()}X${to.text()}"
     }
 
-    override fun internalMoveImpl(board: Board, block: MoveVisitor) {
+    override fun internalMoveImpl(board: Board,moveVisitor: MoveVisitor) {
         val piece = board[from]
         val capturedPiece = board[to]
         board[from] = EMPTY
@@ -167,7 +169,7 @@ interface CaptureMove : Move {
         board.elementsLeft--
 
         try {
-            block()
+            moveVisitor(false)
 
         } finally {
 
@@ -318,14 +320,16 @@ class KingSimpleMove private constructor(override val from: Coord, override val 
         }
     }
 
-    override fun internalMoveImpl(board: Board, block: MoveVisitor) {
+    override fun internalMoveImpl(board: Board,moveVisitor: MoveVisitor) {
         val piece = board[from]
         board[from] = EMPTY
         board[to] = piece
+        val oldCastlingBits = board.castlingBitsPublic
         updateCastlingRights(board, from)
+        val isReversible: Boolean = oldCastlingBits == board.castlingBitsPublic
 
         try {
-            block()
+            moveVisitor(isReversible)
         } finally {
             board[from] = piece
             board[to] = EMPTY
@@ -391,14 +395,14 @@ class PawnTwoStepMove private constructor(val from: Coord, val to: Coord) : Move
         return false
     }
 
-    override fun internalMoveImpl(board: Board, block: MoveVisitor) {
+    override fun internalMoveImpl(board: Board,moveVisitor: MoveVisitor) {
         val piece = board[from]
         board[from] = EMPTY
         board[to] = piece
         board.enPassantColumn = (from.index % 8).toByte()
 
         try {
-            block()
+            moveVisitor(false)
         } finally {
             board[from] = piece
             board[to] = EMPTY
@@ -443,7 +447,7 @@ class EnPassantMove private constructor(override val from: Coord, override val t
         return duckPos == to
     }
 
-    override fun internalMoveImpl(board: Board, block: MoveVisitor) {
+    override fun internalMoveImpl(board: Board,moveVisitor: MoveVisitor) {
         val piece = board[from]
         val capturedPiece = board[to]
         board[from] = EMPTY
@@ -454,7 +458,7 @@ class EnPassantMove private constructor(override val from: Coord, override val t
         board.elementsLeft--
 
         try {
-            block()
+            moveVisitor(false)
         } finally {
             board.elementsLeft--
 
@@ -487,12 +491,12 @@ class PawnPromotionMove private constructor(val from: Coord, val to: Coord, val 
 
     override fun blockedByDuckAt(duckPos: Coord): Boolean = duckPos == to
 
-    override fun internalMoveImpl(board: Board, block: MoveVisitor) {
+    override fun internalMoveImpl(board: Board,moveVisitor: MoveVisitor) {
         val piece = board[from]
         board[from] = EMPTY
         board[to] = newPiece
 
-        block()
+        moveVisitor(false)
 
         board[from] = piece
         board[to] = EMPTY
@@ -519,7 +523,7 @@ class PawnCapturePromotionMove private constructor(val from: Coord, val to: Coor
         "${piece.text()}${from.text()}X${to.text()}${newPiece.text()}"
     }
 
-    override fun internalMoveImpl(board: Board, block: MoveVisitor) {
+    override fun internalMoveImpl(board: Board,moveVisitor: MoveVisitor) {
         val piece = board[from]
         val capturedPiece = board[to]
         board[from] = EMPTY
@@ -530,7 +534,7 @@ class PawnCapturePromotionMove private constructor(val from: Coord, val to: Coor
         board.elementsLeft--
 
         try {
-            block()
+            moveVisitor(false)
         } finally {
             board.elementsLeft++
 
@@ -549,7 +553,7 @@ class WhiteShortCastleMove private constructor() : Move {
 
     override fun blockedByDuckAt(duckPos: Coord): Boolean = duckPos == G1 || duckPos == F1
 
-    override fun internalMoveImpl(board: Board, block: MoveVisitor) {
+    override fun internalMoveImpl(board: Board,moveVisitor: MoveVisitor) {
         board[E1] = EMPTY
         board[F1] = WHITE_ROOK
         board[G1] = WHITE_KING
@@ -559,7 +563,7 @@ class WhiteShortCastleMove private constructor() : Move {
         board.whiteLongCastlingAllowed = false
 
         try {
-            block()
+            moveVisitor(false)
         } finally {
 
             board[E1] = WHITE_KING
@@ -579,7 +583,7 @@ class WhiteLongCastleMove private constructor() : Move {
 
     override fun blockedByDuckAt(duckPos: Coord): Boolean = duckPos == B1 || duckPos == C1 || duckPos == D1
 
-    override fun internalMoveImpl(board: Board, block: MoveVisitor) {
+    override fun internalMoveImpl(board: Board,moveVisitor: MoveVisitor) {
         board[A1] = EMPTY
         board[B1] = EMPTY
         board[C1] = WHITE_KING
@@ -590,7 +594,7 @@ class WhiteLongCastleMove private constructor() : Move {
         board.whiteLongCastlingAllowed = false
 
         try {
-            block()
+            moveVisitor(false)
         } finally {
             board[A1] = WHITE_ROOK
             board[B1] = EMPTY
@@ -611,7 +615,7 @@ class BlackShortCastleMove private constructor() : Move {
 
     override fun blockedByDuckAt(duckPos: Coord): Boolean = duckPos == G8 || duckPos == F8
 
-    override fun internalMoveImpl(board: Board, block: MoveVisitor) {
+    override fun internalMoveImpl(board: Board,moveVisitor: MoveVisitor) {
         if (board[E8] != BLACK_KING) {
             throw IllegalStateException()
         }
@@ -625,7 +629,7 @@ class BlackShortCastleMove private constructor() : Move {
         board.blackLongCastlingAllowed = false
 
         try {
-            block()
+            moveVisitor(false)
         } finally {
             board[E8] = BLACK_KING
             board[F8] = EMPTY
@@ -644,7 +648,7 @@ class BlackLongCastleMove private constructor() : Move {
 
     override fun blockedByDuckAt(duckPos: Coord): Boolean = duckPos == B8 || duckPos == C8 || duckPos == D8
 
-    override fun internalMoveImpl(board: Board, block: MoveVisitor) {
+    override fun internalMoveImpl(board: Board,moveVisitor: MoveVisitor) {
         if (board[E8] != BLACK_KING) {
             throw IllegalStateException()
         }
@@ -659,7 +663,7 @@ class BlackLongCastleMove private constructor() : Move {
         board.blackLongCastlingAllowed = false
 
         try {
-            block()
+            moveVisitor(false)
         } finally {
             board[A8] = BLACK_ROOK
             board[B8] = EMPTY
@@ -683,7 +687,7 @@ class DuckMove private constructor(val to: Coord) : Move {
 
     override fun text(board: Board) = "${Piece.DUCK.text()}${to.text()}"
 
-    override fun internalMoveImpl(board: Board, block: MoveVisitor) {
+    override fun internalMoveImpl(board: Board,moveVisitor: MoveVisitor) {
         val currentDuckPos = board.duckPosition
         if (currentDuckPos != null) {
             board[currentDuckPos] = EMPTY
@@ -692,7 +696,7 @@ class DuckMove private constructor(val to: Coord) : Move {
         board.duckPosition = to
 
         try {
-            block()
+            moveVisitor(false)
         } finally {
             board[to] = EMPTY
             if (currentDuckPos != null) {

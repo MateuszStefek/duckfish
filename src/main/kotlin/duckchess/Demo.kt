@@ -18,7 +18,7 @@ fun play(initialBoard: Board) {
 
         val selected: SelectedMove
         val millis = measureTimeMillis {
-            selected = minMax.bestMove(currentBoard, Duration.ofSeconds(5 + Random.nextInt(10).toLong()))
+            selected = minMax.bestMove(currentBoard, Duration.ofSeconds(5 + Random.nextInt(40).toLong()))
         }
 
         //System.gc()
@@ -64,32 +64,12 @@ fun main() {
     board = DuckMove.of(Coord.D6).moveAt(board)
 
 /*    board = parseBoard("""
-        ----------------- *
-        |r| |b|q|k|b|X|r|
-        -----------------
-        |p|n|p|p|p|p|p|p|
-        -----------------
-        | | | | | | | | |
-        -----------------
-        | |N| | | | | |Q|
-        -----------------
-        | |P| | |P| | | |
-        -----------------
-        | | | |P|B| | | |
-        -----------------
-        |P| |P| | |P|P|P|
-        -----------------
-        |R| | | |K|B|N|R|
-        ----------------- ep: -1
-    """.trimIndent())*/
-
-/*    board = parseBoard("""
------------------
-| | |n|k|b| | | |
 -----------------
 | | | | | | | | |
 -----------------
 | | | | | | | | |
+-----------------
+| | | | |k| | | |
 -----------------
 | | | | | | | | |
 -----------------
@@ -97,33 +77,13 @@ fun main() {
 -----------------
 | | | | | | | | |
 -----------------
-| | | | | | | |B|
+| | | | | | | |R|
 -----------------
-| | | |r| | | | |
+| | | | | | | | |
 ----------------- * ep: -1
     """.trimIndent())*/
 
-/*
-    board = parseBoard("""
-        ----------------- *
-        | | | | | | | | |
-        -----------------
-        | | | | |b| |k|X|
-        -----------------
-        | | |q| | | | |p|
-        -----------------
-        | |R|p| |p|N|p|P|
-        -----------------
-        |P| | |r| | | |R|
-        -----------------
-        | | | |P| | | | |
-        -----------------
-        | | |P| |K|P|B| |
-        -----------------
-        | | | | | | | | |
-        ----------------- ep: -1
-    """.trimIndent())
-*/
+
     //board = positionUndecidedBug
 
     play(board)

@@ -92,7 +92,8 @@ val bug1Position = Board.apOf(
  * Bug White seen the pawn as a guaranteed capture,
  * so it never captured it, actually.
  */
-val positionUndecidedBug = parseBoard("""
+val positionUndecidedBug = parseBoard(
+    """
     ----------------- *
     | | | | | | | | |
     -----------------
@@ -110,10 +111,12 @@ val positionUndecidedBug = parseBoard("""
     -----------------
     | | | | | | | | |
     ----------------- ep: -1
-""".trimIndent())
+""".trimIndent()
+)
 
 // Drawish in general
-val positionKRBPvsKR = """
+val positionKRBPvsKR = parseBoard(
+    """
     ----------------- *
     | | | | | | |k| |
     -----------------
@@ -132,3 +135,4 @@ val positionKRBPvsKR = """
     | | | | | | | | |
     ----------------- ep: -1
 """.trimIndent()
+)
