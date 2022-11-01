@@ -435,7 +435,13 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
             var i = 0
             while (i < moveCount) {
                 val moveWithScore = allMoves[i]
-                val score = moveStrengthEstimation(moveWithScore.move, board, areWeWhite)
+                val move = moveWithScore.move
+                var score = moveStrengthEstimation(move, board, areWeWhite)
+                if (move === bestMoveFromCache) {
+                    score += 1000
+                } else if (move === secondBestMoveFromCache) {
+                    score += 300
+                }
                 moveWithScore.score = score
                 i++
             }

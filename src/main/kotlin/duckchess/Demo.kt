@@ -18,9 +18,9 @@ fun play(initialBoard: Board) {
         val millis = measureTimeMillis {
             selected = minMax.bestMove(
                 currentBoard, Duration.ofSeconds(
-                    1 + Random.nextInt(2).toLong()
+                    10 + Random.nextInt(20).toLong()
                             + (when (currentBoard.phase) {
-                        Phase.BLACK_PIECE_MOVE -> 3
+                        Phase.BLACK_PIECE_MOVE -> 30
                         else -> 0
                     })
 
