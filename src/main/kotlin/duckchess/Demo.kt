@@ -14,11 +14,18 @@ fun play(initialBoard: Board) {
     val minMax = MinMax()
 
     while (currentBoard.result == GameResult.UNDECIDED) {
-        //minMax.maxDepth = if (currentBoard.phase == Phase.WHITE_PIECE_MOVE) 7 else 4
-
         val selected: SelectedMove
         val millis = measureTimeMillis {
-            selected = minMax.bestMove(currentBoard, Duration.ofSeconds(5 + Random.nextInt(40).toLong()))
+            selected = minMax.bestMove(
+                currentBoard, Duration.ofSeconds(
+                    1 + Random.nextInt(2).toLong()
+                            + (when (currentBoard.phase) {
+                        Phase.BLACK_PIECE_MOVE -> 3
+                        else -> 0
+                    })
+
+                )
+            )
         }
 
         //System.gc()
@@ -28,11 +35,11 @@ fun play(initialBoard: Board) {
 
         println(
             "Moving: $moveNumber. ${selected.text(currentBoard)}," +
-                " evaluated positions: ${minMax.staticEvalCount}" +
-                " visited nodes: ${minMax.visitedNodes}" +
-                " evaluated in ${millis}ms " +
-                " memUsage:$memUsage" +
-                " cache: ${minMax.transpositionCache.maxSize}"
+                    " evaluated positions: ${minMax.staticEvalCount}" +
+                    " visited nodes: ${minMax.visitedNodes}" +
+                    " evaluated in ${millis}ms " +
+                    " memUsage:$memUsage" +
+                    " cache: ${minMax.transpositionCache.maxSize}"
         )
 
         currentBoard = selected.move.moveAt(currentBoard)
@@ -62,26 +69,30 @@ fun main() {
     board = DuckMove.of(Coord.E7).moveAt(board)
     board = KnightSimpleMove.of(Coord.G1, Coord.F3).moveAt(board)
     board = DuckMove.of(Coord.D6).moveAt(board)
+    board = KnightSimpleMove.of(Coord.G8, Coord.E7).moveAt(board)
+    board = DuckMove.of(Coord.E3).moveAt(board)
+    board = KnightSimpleMove.of(Coord.B1, Coord.C3).moveAt(board)
+    board = DuckMove.of(Coord.G6).moveAt(board)
 
-/*    board = parseBoard("""
------------------
-| | | | | | | | |
------------------
-| | | | | | | | |
------------------
-| | | | |k| | | |
------------------
-| | | | | | | | |
------------------
-| | |K| | | | | |
------------------
-| | | | | | | | |
------------------
-| | | | | | | |R|
------------------
-| | | | | | | | |
------------------ * ep: -1
-    """.trimIndent())*/
+    /*    board = parseBoard("""
+    ----------------- *
+    | | | |K| | | | |
+    -----------------
+    | | | | |X| | | |
+    -----------------
+    |q| | | | | | | |
+    -----------------
+    | | | | | | |q| |
+    -----------------
+    | | | | | | |k| |
+    -----------------
+    | | | |Q| | | | |
+    -----------------
+    | | | | | | | | |
+    -----------------
+    | | | | | | | | |
+    ----------------- ep: -1
+        """.trimIndent())*/
 
 
     //board = positionUndecidedBug

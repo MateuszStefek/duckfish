@@ -105,8 +105,11 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
         while (true) {
             try {
                 val startThisDepth = Instant.now()
-                selectedMove = bestMove(board, maxDepth, selectedMove?.move)
-                println("Best move at depth ${maxDepth}: ${selectedMove.text(board)}")
+                cutOffTime = start.plus(duration)
+
+                selectedMove = selectMoveAtDepth(boardArg.copyBoard(), maxDepth, selectedMove)
+                val totalTimeFromStart = Duration.between(start, Instant.now())
+                println("Best move at depth ${maxDepth}: ${selectedMove.text(board)} after ${totalTimeFromStart} from start")
 
                 if (isDecisiveScore(selectedMove.score)) {
                     // If at Ply7 we evaluate to K8, we don't need to evaluate at Ply8
@@ -124,7 +127,7 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
 
                 val endThisDepth = Instant.now()
                 val durationThisDepth = Duration.between(startThisDepth, endThisDepth)
-                cutOffTime = start.plus(duration)
+
                 maxDepth++
                 if (Instant.now().plus(durationThisDepth.dividedBy(4)).isAfter(cutOffTime)) {
                     println("Giving up on evaluating at depth ${maxDepth}")
@@ -137,11 +140,39 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
         }
     }
 
-    fun bestMove(board: Board, maxDepth: Int, previousBestMove: Move? = null): SelectedMove {
+    private fun selectMoveAtDepth(board: Board, maxDepth: Int, previousDepthSelectedMove: SelectedMove?): SelectedMove {
+        if (previousDepthSelectedMove != null) {
+            if (!isDecisiveScore(previousDepthSelectedMove.score)) {
+                var aspAlpha = previousDepthSelectedMove.score - 75
+                var aspBeta = previousDepthSelectedMove.score + 75
+                println("Aspirational search at depth ${maxDepth} with alpha=${aspAlpha}, beta=${aspBeta}")
+                val aspirationResult = bestMove(board, maxDepth, null, aspAlpha, aspBeta)
+                if (aspirationResult.score in (aspAlpha + 1) until aspBeta) {
+                    println("Aspirational search at depth ${maxDepth} with alpha=${aspAlpha}, beta=${aspBeta} succeeded with score=${aspirationResult.score}}")
+                    return aspirationResult
+                }
+                println("Aspirational search at depth ${maxDepth} with alpha=${aspAlpha}, beta=${aspBeta} failed with score=${aspirationResult.score}")
+            }
+        }
+        var alpha = -99_999
+        var beta = 99_999
+        println("Full search at depth ${maxDepth}")
+        return bestMove(board, maxDepth, previousDepthSelectedMove?.move, alpha, beta)
+    }
+
+    fun bestMove(
+        board: Board,
+        maxDepth: Int,
+        previousBestMove: Move? = null,
+        alpha: Int = -99_999,
+        beta: Int = 99_999,
+    ): SelectedMove {
         val boardEval = NodeEvaluation(
             board = board,
             remainingDepth = maxDepth * finalHorizontDepth,
-            bestMovePreviousDepth = previousBestMove
+            bestMovePreviousDepth = previousBestMove,
+            alphaArg = alpha,
+            beta = beta
         )
             .negMax()!!
 
@@ -242,10 +273,11 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
                 evaluateRecursively(areWeWhite = areWeWhite, scoredCoordSet = s)
             }
         }
+
         private fun evaluateRecursively(areWeWhite: Boolean, scoredCoordSet: ScoredCoordSet): BoardEval? {
             return moveWithScoreArrayPool.withMoveScoreArray { allMovesArray ->
                 val moveCount = generateMoves(allMovesArray)
-                evaluateMovesRecursively(areWeWhite, scoredCoordSet, allMovesArray, moveCount)
+                evaluateMovesRecursively( areWeWhite, scoredCoordSet, allMovesArray, moveCount)
             }
         }
 
@@ -265,7 +297,7 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
             /*
              * Trick to avoid multiple allocations of the lambda passed to move.moveAndRevert
              */
-            val moveAnalyser = object: MoveVisitor {
+            val moveAnalyser = object : MoveVisitor {
                 private lateinit var move: Move
 
                 fun analyze(move: Move) {
@@ -385,13 +417,14 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
             Coord.forEach { coord ->
                 val piece = board[coord]
                 if (piece == Piece.EMPTY) {
-                if (coordA.index == -1) {
-                    coordA = coord
-                } else if (coordB.index == -1) {
-                    coordB = coord
-                    return@forEach
+                    if (coordA.index == -1) {
+                        coordA = coord
+                    } else if (coordB.index == -1) {
+                        coordB = coord
+                        return@forEach
+                    }
                 }
-            }}
+            }
 
             return BoardEval(scoreA = 0, duckPosA = coordA, scoreB = 0, duckPosB = coordB)
         }
@@ -421,13 +454,13 @@ class MinMax(val evaluator: Evaluator = Evaluator()) {
                 if (!parentNode.enteredWithReversibleMove) return false
                 node = parentParent
                 if (node.hashOfBoard == currentHash) return true
-            } while(true)
+            } while (true)
         }
     }
 
 
     private fun checkTimeout() {
-        cutOffTime?.let { if (System.currentTimeMillis() > it.toEpochMilli() ) throw Stop() }
+        cutOffTime?.let { if (System.currentTimeMillis() > it.toEpochMilli()) throw Stop() }
     }
 
 
@@ -499,7 +532,7 @@ private class MoveScoreArrayPool {
 }
 
 
-private val singletonMoveGeneratorConsumer = object: (Move) -> Unit {
+private val singletonMoveGeneratorConsumer = object : (Move) -> Unit {
     var counter = 0
     var arrayToFill: Array<MoveWithScore> = Array(0) { TODO() }
     override fun invoke(move: Move) {
